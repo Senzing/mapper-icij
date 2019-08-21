@@ -102,13 +102,15 @@ Configuration updates include:
 
 Download the raw files from ... https://offshoreleaks.icij.org/pages/database
 
-There are 4 zip files containing all of these files. Its best just to unzip them all on the same directory
+There are 4 zip files containing the files listed below. Its best just to unzip them all on the same directory
+
 **csv_panama_papers.zip**
 - panama_papers.nodes.address.csv
 - panama_papers.nodes.entity.csv
 - panama_papers.nodes.intermediary.csv
 - panama_papers.nodes.officer.csv
 - panama_papers.edges.csv
+
 **csv_paradice_papers.zip**
 - paradise_papers.nodes.address.csv
 - paradise_papers.nodes.entity.csv
@@ -116,12 +118,14 @@ There are 4 zip files containing all of these files. Its best just to unzip them
 - paradise_papers.nodes.officer.csv
 - paradise_papers.nodes.other.csv
 - paradise_papers.edges.csv
+
 **csv_bahamas_leaks.zip**
 - bahamas_leaks.nodes.address.csv
 - bahamas_leaks.nodes.entity.csv
 - bahamas_leaks.nodes.intermediary.csv
 - bahamas_leaks.nodes.officer.csv
 - bahamas_leaks.edges.csv
+
 **csv_offshore_leaks.zip**
 - offshore_leaks.nodes.address.csv
 - offshore_leaks.nodes.entity.csv
