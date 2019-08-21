@@ -111,7 +111,7 @@ There are 4 zip files containing the files listed below. Its best just to unzip 
 - panama_papers.nodes.officer.csv
 - panama_papers.edges.csv
 
-**csv_paradice_papers.zip**
+**csv_paradise_papers.zip**
 - paradise_papers.nodes.address.csv
 - paradise_papers.nodes.entity.csv
 - paradise_papers.nodes.intermediary.csv
