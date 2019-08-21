@@ -9,14 +9,14 @@ csv files to json files ready to load into senzing.  This includes the ...
 - Bahamas Leaks
 - Offshore Leaks
 
-Loading these watch lists requires additional features and configurations of Senzing. These are contained in the 
+Loading IJIC data into Senzing requires additional features and configurations. These are contained in the 
 [ijic_config_updates.json](ijic_config_updates.json) file and are applied with the [G2ConfigTool.py](G2ConfigTool.py) also contained in this project.
 
 Usage:
 ```console
 python ijic_mapper.py --help
 usage: ijic_mapper.py [-h] [-m MAPPING_LIBRARY_PATH] [-i INPUT_PATH]
-                      [-o OUTPUT_PATH] [-d DATABASE] [-t NODE_TYPE]
+                      [-o OUTPUT_FILE] [-d DATABASE] [-t NODE_TYPE]
                       [-c ISO_COUNTRY_SIZE] [-s STATISTICS_FILE] [-nr] [-R]
 
 optional arguments:
@@ -25,9 +25,8 @@ optional arguments:
                         path to the mapping functions library files.
   -i INPUT_PATH, --input_path INPUT_PATH
                         path to the downloaded IJIC csv files.
-  -o OUTPUT_PATH, --output_path OUTPUT_PATH
-                        path to the output files which default to input file
-                        name with a .json extension.
+  -o OUTPUT_FILE, --output_file OUTPUT_FILE
+                        path and file name for the json output.
   -d DATABASE, --database DATABASE
                         choose: panama, bahamas, paradise, offshore or all,
                         default=all
@@ -49,7 +48,7 @@ optional arguments:
 1. [Prerequisites](#Prerequisites)
 2. [Installation](#Installation)
 3. [Configuring Senzing](#Configuring-Senzing)
-4. [Running the dj2json mapper](#Running-the-ijic_mapper)
+4. [Running the mapper](#Running-the-mapper)
 5. [Loading into Senzing](#Loading-into-Senzing)
 6. [Mapping other data sources](#Mapping-other-data-sources)
 7. [Optional ini file parameter](#Optional-ini-file-parameter)
@@ -65,6 +64,8 @@ optional arguments:
 Place the the following files on a directory of your choice ...
 - [ijic_mapper.py](ijic_mapper.py) 
 - [ijic_config_updates.json](ijic_config_updates.json)
+
+*Note: Since the mapper-functions project referenced above is required by this mapper, it is a necessary to place them in a common directory structure.*
 
 ### Configuring Senzing
 
@@ -94,43 +95,65 @@ Configuration updates include:
     - CK_NAME_ORGNAME
 
 *WARNING:* the following settings are commented out as they affect performance and quality. Only use them if you understand and are OK with the effects.
-- sets **NAME** and **ADDRESS** to be used for candidates. Normally just their hashes are used to find candidates.  The effect is performance is slightly degraded.
-- set **GROUP_ASSOCIATION** feature to be used for candidates.
-
+- sets **NAME**, **ADDRESS** and **GROUP_ASSOCIATION** to be used for candidates. Normally just their hashes are used to find candidates.  The effect is performance is slightly degraded.
 - set **distinct** off.  Normally this is on to prevent lower strength AKAs to cause matches as only the most distinct names are considered. The effect is more potential false positives.
 
-### Running the ijic_mapper
+### Running the mapper
 
-*Note: It is not necessary to run this mapper!  The source files are free and static so both the input and output file are included in this project.  The code has been included in case any changes are to the mappings are desired or if updates are made to the mapping functions and standards project used by all your data sources.*
+Download the raw files from ... https://offshoreleaks.icij.org/pages/database
 
+There are 4 zip files containing all of these files. Its best just to unzip them all on the same directory
+**csv_panama_papers.zip**
+- panama_papers.nodes.address.csv
+- panama_papers.nodes.entity.csv
+- panama_papers.nodes.intermediary.csv
+- panama_papers.nodes.officer.csv
+- panama_papers.edges.csv
+**csv_paradice_papers.zip**
+- paradise_papers.nodes.address.csv
+- paradise_papers.nodes.entity.csv
+- paradise_papers.nodes.intermediary.csv
+- paradise_papers.nodes.officer.csv
+- paradise_papers.nodes.other.csv
+- paradise_papers.edges.csv
+**csv_bahamas_leaks.zip**
+- bahamas_leaks.nodes.address.csv
+- bahamas_leaks.nodes.entity.csv
+- bahamas_leaks.nodes.intermediary.csv
+- bahamas_leaks.nodes.officer.csv
+- bahamas_leaks.edges.csv
+**csv_offshore_leaks.zip**
+- offshore_leaks.nodes.address.csv
+- offshore_leaks.nodes.entity.csv
+- offshore_leaks.nodes.intermediary.csv
+- offshore_leaks.nodes.officer.csv
+- offshore_leaks.edges.csv
+
+The mapper will read all the files and create one output file.  Example usage:
 ```console
-python3 ijic_mapper -m <path-to-mapping-library-files> -i /<path-to-ijic-files> -o /<path-to-store-mapped-output-files>
+python3 ijic_mapper.py -m ../mapper-functions -i ./input -o ./output/ijic_2018.json
 ```
-- Use the -d parameter if you just want to map one of the 4 databases from IJIC (panama, paradise, bahamas or offshore).
-- Use the -t parameter if you just want to map one of the 3 node_types from IJIC (entity, intermediary, or officer).
-- Use the -c parameter to change from 3 character to 2 character ISO country codes.
-- use the -d parameter if you have renamed the input file so that neither PFA nor HRF is in the file name.
+- Add the -d parameter if you just want to map one of the 4 databases from IJIC (panama, paradise, bahamas or offshore).
+- Add the -t parameter if you just want to map one of the 3 node_types from IJIC (entity, intermediary, or officer).
+- Add the -c parameter to change from 3 character to 2 character ISO country codes.
 - Use the -s parameter to log the mapping statistics to a file.
 - Use the -nr parameter to not create relationships.  This watch list has many disclosed relationships.  It is good to have them, but it loads faster if you turn them off.
-- Use the -R parameter if you have downloaded fresh CSV files from the IJIC website.
-
-*Note* The mapping satistics should be reviewed occasionally to determine if there are other values that can be mapped to new features.  Check the UNKNOWN_ID section for values that you may get from other data sources that you would like to make into features.  Most of these values were not mapped because there just aren't enough of them to matter and/or you are not likely to get them from any other data sources. However, DUNS_NUMBER, LEI_NUMBER, and the other new features listed above were found by reviewing these statistics!
+- Use the -R parameter if you have downloaded fresh csv files from the IJIC website.
 
 ### Loading into Senzing
 
 If you use the G2Loader program to load your data, from the /opt/senzing/g2/python directory ...
 ```console
-python3 G2Loader.py -f /<path-to-file>/PFA2_201902282200_F.xml.json
+python3 G2Loader.py -f /ijic_mapper/output/ijic_2018.json
 ```
-The PFA data set currently contains about 2.4 million records and make take a few hours to load depending on your harware.  The HRF file only contains about 70k records and loads in a few minutes. 
-
-If you use the API directly, then you just need to perform an addRecord for each line of the file.
+This data set currently contains about 1.5 million records and make take a few hours to load depending on your harware.
+If you use the API directly, then you just need to perform an addRecord() for each line of the file.
 
 ### Mapping other data sources
 
 Watch lists are harder to match simply because often the only data they contain that matches your other data sources are name, partial date of birth, and citizenship or nationality.  Complete address or identifier matches are possible but more rare. For this reason, the following special attributes should be mapped from your internal data sources or search request messages ... 
 - **RECORD_TYPE** (valid values are PERSON or ORGANIZATION, only supply if known.)
-- **COUNTRY_CODE:** standardized with iso\*.json files included in this package. Simply find any country you can and look it up in either the isoCountries2.json or isoCountries3.json, whichever one you decide to standardize on, and map its iso code to an attribute called country_code. You can prefix with a source word like so ...
+- **COUNTRY_CODE:** standardized country codes using the mapping_functions project. Simply find any country in your source data and look it up in mapping_standards.json file and map its iso code to an attribute called country_code. You can prefix with a source word like so ...
 ```console
 {
   "NATIONALITY_COUNTRY_CODE": "GER",
@@ -141,7 +164,7 @@ Watch lists are harder to match simply because often the only data they contain 
 }
 ```
 *note: if your source word is an expression, use dashes not underscores so as not to confuse the engine*
-- **GROUP_ASSOCIATION_ORG_NAME** (Sometimes all you know about a person is who they work for or what groups they are otherwise affiliated with. Consider a contact list that has name, phone number, and company they work for.   Map the company name to the GROUP_ASSOCIATION_ORG_NAME attribute as that may be the only matching attribute to the watch list.
+- **GROUP_ASSOCIATION_ORG_NAME** (Sometimes all you know about a person is who they work for or what groups they are affiliated with. Consider a contact list that has name, phone number, and company they work for.   Map the company they work for to the GROUP_ASSOCIATION_ORG_NAME attribute as that may be the only matching attribute to the watch list.
 - **PLACE_OF_BIRTH**, **DUNS_NUMBER**, or any of the other additional features listed above. 
 
 ### Optional ini file parameter
