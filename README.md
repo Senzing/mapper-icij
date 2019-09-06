@@ -63,8 +63,10 @@ Place the the following files on a directory of your choice ...
 - [ijic_config_updates.json](ijic_config_updates.json)
 
 *Note: Since the mapper-base project referenced above is required by this mapper, it is necessary to place them in a common directory structure like so ...*
+```Console
 /senzing/mappers/mapper-base
 /senzing/mappers/mapper-ijic         <--
+```
 
 ### Configuring Senzing
 
