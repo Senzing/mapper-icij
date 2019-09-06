@@ -34,7 +34,7 @@ def updateStat(cat1, cat2, example = None):
         statPack[cat1] = {}
     if cat2 not in statPack[cat1]:
         statPack[cat1][cat2] = {}
-        statPack[cat1][cat2]['count'] = 1
+        statPack[cat1][cat2]['count'] = 0
 
     statPack[cat1][cat2]['count'] += 1
     if example:
@@ -52,7 +52,7 @@ def updateStat(cat1, cat2, example = None):
 def csv2db():
     ''' load database '''
     for fileDict in inputFiles:
-        if fileDict['ijicSource'].upper() == ijicSource.upper() or ijicSource.upper() == 'ALL':
+        if fileDict['nodeDatabase'].upper() == nodeDatabase.upper() or nodeDatabase.upper() == 'ALL':
             dbObj = conn.cursor()
             dbCursor = dbObj.execute("select name from sqlite_master where type='table' AND name='%s'" % fileDict['tableName'])
             dbRow = dbCursor.fetchone()
@@ -64,7 +64,7 @@ def csv2db():
                 if fileDict['nodeType'] != 'edges':
                     conn.cursor().execute('create unique index ix_%s on %s (node_id, sourceID)' % (fileDict['tableName'], fileDict['tableName']))
                 else:
-                    if fileDict['ijicSource'] in ['bahamas']:
+                    if fileDict['nodeDatabase'] in ['bahamas']:
                         relTypeField = 'rel_type'
                         node1Field = 'node_1'
                         node2Field = 'node_2'
@@ -76,7 +76,7 @@ def csv2db():
                     conn.cursor().execute('create index ix_%s1 on %s (%s, %s)' % (fileDict['tableName'], fileDict['tableName'], node1Field, node2Field))
                     conn.cursor().execute('create index ix_%s2 on %s (%s, %s)' % (fileDict['tableName'], fileDict['tableName'], node2Field, node1Field))
                     
-                    sql = "create view %s_view as " % (fileDict['ijicSource'] + '_edges',)
+                    sql = "create view %s_view as " % (fileDict['nodeDatabase'] + '_edges',)
                     sql += "select  "
                     sql += " a.%s as node_1, " % (node1Field,)
                     sql += " case when b.node_id is null then "
@@ -115,15 +115,15 @@ def csv2db():
                     sql += "  else f.name end as node2_desc, "
                     sql += " a.start_date, "
                     sql += " a.end_date "
-                    sql += "from %s a "  % (fileDict['ijicSource'] + '_edges',)
-                    sql += "left join %s b on b.node_id = a.%s "  % (fileDict['ijicSource'] + '_entity', node1Field)
-                    sql += "left join %s c on c.node_id = a.%s "  % (fileDict['ijicSource'] + '_intermediary', node1Field)
-                    sql += "left join %s d on d.node_id = a.%s "  % (fileDict['ijicSource'] + '_officer', node1Field)
-                    sql += "left join %s e on e.node_id = a.%s "  % (fileDict['ijicSource'] + '_address', node1Field) 
-                    sql += "left join %s f on f.node_id = a.%s "  % (fileDict['ijicSource'] + '_entity', node2Field)
-                    sql += "left join %s g on g.node_id = a.%s "  % (fileDict['ijicSource'] + '_intermediary', node2Field)
-                    sql += "left join %s h on h.node_id = a.%s "  % (fileDict['ijicSource'] + '_officer', node2Field)
-                    sql += "left join %s i on i.node_id = a.%s "  % (fileDict['ijicSource'] + '_address', node2Field)
+                    sql += "from %s a "  % (fileDict['nodeDatabase'] + '_edges',)
+                    sql += "left join %s b on b.node_id = a.%s "  % (fileDict['nodeDatabase'] + '_entity', node1Field)
+                    sql += "left join %s c on c.node_id = a.%s "  % (fileDict['nodeDatabase'] + '_intermediary', node1Field)
+                    sql += "left join %s d on d.node_id = a.%s "  % (fileDict['nodeDatabase'] + '_officer', node1Field)
+                    sql += "left join %s e on e.node_id = a.%s "  % (fileDict['nodeDatabase'] + '_address', node1Field) 
+                    sql += "left join %s f on f.node_id = a.%s "  % (fileDict['nodeDatabase'] + '_entity', node2Field)
+                    sql += "left join %s g on g.node_id = a.%s "  % (fileDict['nodeDatabase'] + '_intermediary', node2Field)
+                    sql += "left join %s h on h.node_id = a.%s "  % (fileDict['nodeDatabase'] + '_officer', node2Field)
+                    sql += "left join %s i on i.node_id = a.%s "  % (fileDict['nodeDatabase'] + '_address', node2Field)
                     conn.cursor().execute(sql)
 
     return
@@ -131,7 +131,7 @@ def csv2db():
 #----------------------------------------
 def processTable(fileDict):
 
-    ijicSource = fileDict['ijicSource']
+    nodeDatabase = fileDict['nodeDatabase']
     nodeType = fileDict['nodeType']
     tableName = fileDict['tableName']
     
@@ -151,7 +151,7 @@ def processTable(fileDict):
     while dbRow:
         rowCount += 1
         nodeRecord = dict(zip(dbHeader, dbRow))
-        jsonData = node2Json(tableName, nodeRecord, ijicSource, nodeType)
+        jsonData = node2Json(tableName, nodeRecord, nodeDatabase, nodeType)
         msg = json.dumps(jsonData, ensure_ascii=False)
         #if len(msg) > 10000:
         #    print(msg)
@@ -165,6 +165,8 @@ def processTable(fileDict):
             print('')
             global shutDown
             shutDown = True
+
+        if shutDown:
             break
 
         dbRow = dbCursor.fetchone()
@@ -175,12 +177,12 @@ def processTable(fileDict):
     return shutDown
 
 #----------------------------------------
-def node2Json(tableName, nodeRecord, ijicSource, nodeType):
+def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
     ''' map node to json structure '''
     
     #--set the data source
     jsonData = {}
-    jsonData['DATA_SOURCE'] = 'IJIC'
+    jsonData['DATA_SOURCE'] = 'IJIC' + '-' + nodeDatabase
     jsonData['RECORD_ID'] = str(nodeRecord['node_id'])
 
     #--cleanup the name ("the bearer" is like "unknown")
@@ -190,25 +192,33 @@ def node2Json(tableName, nodeRecord, ijicSource, nodeType):
         entityName = ''
 
     #--not all officers are actually people!
-    if nodeType.upper() == 'OFFICER' and not mappingLib.isCompanyName(entityName):
+    if nodeType.upper() == 'OFFICER' and not baseLibrary.isCompanyName(entityName):
         jsonData['ENTITY_TYPE'] = 'PERSON'
         jsonData['PRIMARY_NAME_FULL'] = entityName
     else:
         jsonData['ENTITY_TYPE'] = 'ORGANIZATION'
         jsonData['PRIMARY_NAME_ORG'] = entityName
     jsonData['RECORD_TYPE'] = jsonData['ENTITY_TYPE']
-
-    #--set the IJIC source
-    jsonData['ijic_source'] = ijicSource.upper()
-    jsonData['node_type'] = nodeType.upper()
+    jsonData['Node_type'] = nodeType.upper()
 
     updateStat('DATA_SOURCE', jsonData['DATA_SOURCE'])
     updateStat('ENTITY_TYPE', jsonData['ENTITY_TYPE'])
-    updateStat('IJIC_SOURCE', jsonData['ijic_source'])
-    updateStat('NODE_TYPE', jsonData['node_type'])
+    updateStat('NODE_TYPE', nodeType.upper())
 
+    if 'jurisdiction' in nodeRecord and nodeRecord['jurisdiction']:
+        jsonData['Jurisdiction_country'] = nodeRecord['jurisdiction']
+    if 'jurisdiction_description' in nodeRecord and nodeRecord['jurisdiction_description']:
+        jsonData['Jurisdiction_description'] = nodeRecord['jurisdiction_description']
+
+    if 'country_codes' in nodeRecord and nodeRecord['country_codes']:
+        instance = 0
+        for linkedCountry in nodeRecord['country_codes'].split(';'):
+            jsonData['Linked_country%s' % (('_' + str(instance)) if instance > 0 else '')] = linkedCountry
+            instance += 1
     if 'countries' in nodeRecord and nodeRecord['countries']:
-        jsonData['Countries'] = nodeRecord['countries']
+        jsonData['Linked_country_names'] = nodeRecord['countries']
+
+
     if 'status' in nodeRecord and nodeRecord['status']:  #--officers don't have status
         jsonData['Status'] = nodeRecord['status']
 
@@ -217,21 +227,12 @@ def node2Json(tableName, nodeRecord, ijicSource, nodeType):
         jsonData['Company type'] = nodeRecord['company_type']
     if 'incorporation_date' in nodeRecord and nodeRecord['incorporation_date']:
         jsonData['Incorporated'] = nodeRecord['incorporation_date']
-    if 'jurisdiction_description' in nodeRecord and nodeRecord['jurisdiction_description']:
-        jsonData['Jurisdictions'] = nodeRecord['jurisdiction_description']
     if 'inactivation_date' in nodeRecord and nodeRecord['inactivation_date']:
         jsonData['Inactivated'] = nodeRecord['inactivation_date']
     if 'struck_off_date' in nodeRecord and nodeRecord['struck_off_date']:
         jsonData['Struck off'] = nodeRecord['struck_off_date']
-            	
-    #--any node can have notes, but I think only entities actually do
     if 'note' in nodeRecord and nodeRecord['note']:
         jsonData['Notes'] = nodeRecord['note']
-
-    #--accumulate country codes
-    countryCodeList = []
-    if 'country_codes' in nodeRecord and nodeRecord['country_codes']:
-        countryCodeList += nodeRecord['country_codes'].split()
 
     #--entities and intermediaries used to have addresses, left here just in case they come back
     #--just store the list here, there may be related address nodes (usually duplicates of these!)
@@ -244,7 +245,7 @@ def node2Json(tableName, nodeRecord, ijicSource, nodeType):
     officerOfList = []
     edgeRecords = []
     edgeObj = conn.cursor()
-    edgeSql = 'select * from %s_edges_view where node_1 = %s or node_2 = %s' % (ijicSource, nodeRecord['node_id'], nodeRecord['node_id'])
+    edgeSql = 'select * from %s_edges_view where node_1 = %s or node_2 = %s' % (nodeDatabase, nodeRecord['node_id'], nodeRecord['node_id'])
     edgeCursor = edgeObj.execute(edgeSql)        
     edgeHeader = [col[0] for col in edgeObj.description]
     edgeRow = edgeCursor.fetchone()
@@ -256,8 +257,7 @@ def node2Json(tableName, nodeRecord, ijicSource, nodeType):
             if edgeRecord['node2_type'] == 'address': #--should always be true
                 if edgeRecord['node2_desc'] not in addressList:
                     addressList.append(edgeRecord['node2_desc'])
-                if 'country_codes' in edgeRecord and edgeRecord['country_codes']:
-                    countryCodeList += edgeRecord['country_codes'].split()
+
         #--map the related node as a disclosed relationship
         else:
             edgeRecord['logical_node2'] = edgeRecord['node_2'] if edgeRecord['node_1'] == nodeRecord['node_id'] else edgeRecord['node_1']
@@ -297,39 +297,6 @@ def node2Json(tableName, nodeRecord, ijicSource, nodeType):
             else:
                 jsonData['OFFICER_OF_LIST'] = subList
 
-    #--add the iso country codes
-    subList = []
-    for cntryCode in set(countryCodeList):
-        isoCntryCode = mappingLib.isoCountryCode(cntryCode)
-        if isoCntryCode:
-            subList.append({'COUNTRY_CODE': isoCntryCode})
-    if subList:
-        if len(subList) == 1:
-            jsonData.update(subList[0])
-        else:    
-            jsonData['ISO_COUNTRY_CODES'] = subList
-
-    #--create composite keys
-    if entityName:
-        nameKey = mappingLib.makeNameKey(entityName, jsonData['ENTITY_TYPE'])
-        compositeKeyList = []
-        
-        #--create composite keys for name/country code
-        if countryCodeList:
-            for countryCode in set(countryCodeList):
-                compositeKeyList.append({"CK_NAME_CNTRY": nameKey + '|' + countryCode})
-
-        #--create composite keys for officer name/orgname
-        if officerOfList:
-            for i in range(len(officerOfList)):
-                if officerOfList[i] and type(officerOfList[i]) == str and len(officerOfList[i]) < 500 and officerOfList[i].upper().strip() not in ('NONE', 'NULL', '[NULL]'):
-                    entityNameKey = mappingLib.makeNameKey(officerOfList[i], 'ORGANIZATION')
-                    compositeKeyList.append({"CK_NAME_ORGNAME": nameKey + '|' + entityNameKey})
-
-        #--add to json if any
-        if compositeKeyList: 
-            jsonData['COMPOSITE_KEY_LIST'] = compositeKeyList
-
 	#--add the disclosed relationships, but summarize to eliminate duplication
     if edgeRecords:
 
@@ -342,15 +309,15 @@ def node2Json(tableName, nodeRecord, ijicSource, nodeType):
                 relationships[edgeRecord['logical_node2']]['RELATED_RECORD_ID'] = edgeRecord['logical_node2']
                 relationships[edgeRecord['logical_node2']]['RELATED_ENTITY_TYPE'] = edgeRecord['logical_type2']
                 relationships[edgeRecord['logical_node2']]['RELATED_RECORD_NAME'] = edgeRecord['logical_desc2']
-                relationships[edgeRecord['logical_node2']]['RELATED_FROM_DATE'] = mappingLib.formatDate(edgeRecord['start_date']) if mappingLib.formatDate(edgeRecord['start_date']) else ''
-                relationships[edgeRecord['logical_node2']]['RELATED_THRU_DATE'] = mappingLib.formatDate(edgeRecord['end_date']) if mappingLib.formatDate(edgeRecord['end_date']) else ''
+                relationships[edgeRecord['logical_node2']]['RELATED_FROM_DATE'] = baseLibrary.formatDate(edgeRecord['start_date']) if baseLibrary.formatDate(edgeRecord['start_date']) else ''
+                relationships[edgeRecord['logical_node2']]['RELATED_THRU_DATE'] = baseLibrary.formatDate(edgeRecord['end_date']) if baseLibrary.formatDate(edgeRecord['end_date']) else ''
             else:
                 if relationships[edgeRecord['logical_node2']]['RELATED_REL_TYPE'] not in edgeRecord['rel_type']:
                     relationships[edgeRecord['logical_node2']]['RELATED_REL_TYPE'] += '|' + edgeRecord['rel_type']
-                nextFromDate = mappingLib.formatDate(edgeRecord['start_date'])
+                nextFromDate = baseLibrary.formatDate(edgeRecord['start_date'])
                 if nextFromDate and nextFromDate < relationships[edgeRecord['logical_node2']]['RELATED_FROM_DATE']: 
                     relationships[edgeRecord['logical_node2']]['RELATED_FROM_DATE'] = nextFromDate
-                nextThruDate = mappingLib.formatDate(edgeRecord['end_date'])
+                nextThruDate = baseLibrary.formatDate(edgeRecord['end_date'])
                 if nextThruDate and nextThruDate < relationships[edgeRecord['logical_node2']]['RELATED_THRU_DATE']:
                     relationships[edgeRecord['logical_node2']]['RELATED_THRU_DATE'] = nextThruDate
             
@@ -375,9 +342,11 @@ def node2Json(tableName, nodeRecord, ijicSource, nodeType):
             else:
                 jsonData['RELATIONSHIP_LIST'] = subList
 
-        #if len(edgeRecords) > 1:
-        #    print(jsonData)
-        #    pause()
+    #--add watch_list keys
+    jsonData = baseLibrary.jsonUpdater(jsonData)
+
+    #print(json.dumps(jsonData, indent=4, sort_keys=True))
+    #pause()
 
     return jsonData
 
@@ -392,49 +361,52 @@ if __name__ == '__main__':
     progressInterval = 10000
 
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('-m', '--mapping_library_path', default=os.getenv('mapping_library_path'.upper(), None), type=str, help='path to the mapping functions library files.')
     argparser.add_argument('-i', '--input_path', default=os.getenv('input_path'.upper(), None), type=str, help='path to the downloaded IJIC csv files.')
     argparser.add_argument('-o', '--output_file', default=os.getenv('output_file'.upper(), None), type=str, help='path and file name for the json output.')
+    argparser.add_argument('-b', '--base_library_path', default=os.getenv('base_library_path'.upper(), None), type=str, help='path to the base library files.')
+    argparser.add_argument('-l', '--log_file', default=os.getenv('log_file'.upper(), None), type=str, help='optional statistics filename (json format).')
     argparser.add_argument('-d', '--database', default=os.getenv('database'.upper(), 'ALL'), type=str, help='choose: panama, bahamas, paradise, offshore or all, default=all')
     argparser.add_argument('-t', '--node_type', default=os.getenv('node_type'.upper(), 'ALL'), type=str, help='choose: entity, intermediary, officer or all, default=all')
-    argparser.add_argument('-c', '--iso_country_size', default=os.getenv('iso_country_size'.upper(), 3), type=int, help='Choose either 2 or 3, default=3.')
-    argparser.add_argument('-s', '--statistics_file', default=os.getenv('statistics_file'.upper(), None), type=str, help='optional statistics filename in json format.')
-    argparser.add_argument('-nr', '--no_relationships', default=os.getenv('no_relationships'.upper(), False), action='store_true', help='do not create disclosed realtionships, an attribute will still be stored')
+    argparser.add_argument('-nr', '--no_relationships', default=os.getenv('no_relationships'.upper(), False), action='store_true', help='do not create disclosed relationships, an attribute will still be stored')
     argparser.add_argument('-R', '--reload_csvs', default=os.getenv('reload_csvs'.upper(), False), action='store_true', help='reload from csvs, don\'t use cached data.')
     args = argparser.parse_args()
-    mappingLibraryPath = args.mapping_library_path
     inputPath = args.input_path
     outputFileName = args.output_file
-    ijicSource = args.database.lower() if args.database else None
+    baseLibraryPath = args.base_library_path
+    logFile = args.log_file
+    nodeDatabase = args.database.lower() if args.database else None
     nodeType = args.node_type.lower() if args.node_type else None
-    isoCountrySize = args.iso_country_size
     noRelationships = args.no_relationships
-    statisticsFile = args.statistics_file
     reloadFromCsvs = args.reload_csvs
 
-    #--initialize the mapping library
-    if not (mappingLibraryPath):
+    #--initialize the base library
+    if not (baseLibraryPath):
         print('')
-        print('Please supply the path to the mapping library files.')
-        print('')
-        sys.exit(1)
-    mappingLibraryPath = os.path.abspath(mappingLibraryPath)
-    mappingFunctionsFile = mappingLibraryPath + os.path.sep + 'mapping_functions.py'
-    mappingStandardsFile = mappingLibraryPath + os.path.sep + 'mapping_standards.json'
-    if not os.path.exists(mappingFunctionsFile) or not os.path.exists(mappingStandardsFile):
-        print('')
-        print('mapping_functions.py or mapping_standards.json missing from %s.' % mappingLibraryPath)
+        print('Please supply the path to the base library project.')
         print('')
         sys.exit(1)
-    sys.path.insert(1, mappingLibraryPath)
-    from mapping_functions import mapping_functions
-    mappingLib = mapping_functions(mappingStandardsFile)
-    if not mappingLib.initialized:
+    baseLibraryPath = os.path.abspath(baseLibraryPath)
+    baseLibraryFile = baseLibraryPath + os.path.sep + 'base_mapper.py'
+    baseVariantFile = baseLibraryPath + os.path.sep + 'base_variants.json'
+    if not os.path.exists(baseLibraryFile) or not os.path.exists(baseVariantFile):
+        print('')
+        print('standardization library files missing from %s.' % baseLibraryPath)
+        print('')
+        sys.exit(1)
+    sys.path.insert(1, baseLibraryPath)
+    from base_mapper import base_library
+    baseLibrary = base_library(baseVariantFile)
+    if not baseLibrary.initialized:
         sys.exit(1)
 
     if not (inputPath):
         print('')
         print('Please supply the path to the downloaded IJIC csv files.')
+        print('')
+
+    if not (outputFileName):
+        print('')
+        print('Please supply an output file name.')
         print('')
 
     #--open output file
@@ -448,31 +420,31 @@ if __name__ == '__main__':
 
     #--register the possible files
     inputFiles = []
-    inputFiles.append({"fileName": "bahamas_leaks.nodes.address.csv", "ijicSource": "bahamas", "nodeType": "address"})
-    inputFiles.append({"fileName": "bahamas_leaks.nodes.entity.csv", "ijicSource": "bahamas", "nodeType": "entity"})
-    inputFiles.append({"fileName": "bahamas_leaks.nodes.intermediary.csv", "ijicSource": "bahamas", "nodeType": "intermediary"})
-    inputFiles.append({"fileName": "bahamas_leaks.nodes.officer.csv", "ijicSource": "bahamas", "nodeType": "officer"})
-    inputFiles.append({"fileName": "offshore_leaks.nodes.address.csv", "ijicSource": "offshore", "nodeType": "address"})
-    inputFiles.append({"fileName": "offshore_leaks.nodes.entity.csv", "ijicSource": "offshore", "nodeType": "entity"})
-    inputFiles.append({"fileName": "offshore_leaks.nodes.intermediary.csv", "ijicSource": "offshore", "nodeType": "intermediary"})
-    inputFiles.append({"fileName": "offshore_leaks.nodes.officer.csv", "ijicSource": "offshore", "nodeType": "officer"})
-    inputFiles.append({"fileName": "panama_papers.nodes.address.csv", "ijicSource": "panama", "nodeType": "address"})
-    inputFiles.append({"fileName": "panama_papers.nodes.entity.csv", "ijicSource": "panama", "nodeType": "entity"})
-    inputFiles.append({"fileName": "panama_papers.nodes.intermediary.csv", "ijicSource": "panama", "nodeType": "intermediary"})
-    inputFiles.append({"fileName": "panama_papers.nodes.officer.csv", "ijicSource": "panama", "nodeType": "officer"})
-    inputFiles.append({"fileName": "paradise_papers.nodes.address.csv", "ijicSource": "paradise", "nodeType": "address"})
-    inputFiles.append({"fileName": "paradise_papers.nodes.entity.csv", "ijicSource": "paradise", "nodeType": "entity"})
-    inputFiles.append({"fileName": "paradise_papers.nodes.intermediary.csv", "ijicSource": "paradise", "nodeType": "intermediary"})
-    inputFiles.append({"fileName": "paradise_papers.nodes.officer.csv", "ijicSource": "paradise", "nodeType": "officer"})
-    inputFiles.append({"fileName": "paradise_papers.nodes.other.csv", "ijicSource": "paradise", "nodeType": "other"})
+    inputFiles.append({"fileName": "bahamas_leaks.nodes.address.csv", "nodeDatabase": "bahamas", "nodeType": "address"})
+    inputFiles.append({"fileName": "bahamas_leaks.nodes.entity.csv", "nodeDatabase": "bahamas", "nodeType": "entity"})
+    inputFiles.append({"fileName": "bahamas_leaks.nodes.intermediary.csv", "nodeDatabase": "bahamas", "nodeType": "intermediary"})
+    inputFiles.append({"fileName": "bahamas_leaks.nodes.officer.csv", "nodeDatabase": "bahamas", "nodeType": "officer"})
+    inputFiles.append({"fileName": "offshore_leaks.nodes.address.csv", "nodeDatabase": "offshore", "nodeType": "address"})
+    inputFiles.append({"fileName": "offshore_leaks.nodes.entity.csv", "nodeDatabase": "offshore", "nodeType": "entity"})
+    inputFiles.append({"fileName": "offshore_leaks.nodes.intermediary.csv", "nodeDatabase": "offshore", "nodeType": "intermediary"})
+    inputFiles.append({"fileName": "offshore_leaks.nodes.officer.csv", "nodeDatabase": "offshore", "nodeType": "officer"})
+    inputFiles.append({"fileName": "panama_papers.nodes.address.csv", "nodeDatabase": "panama", "nodeType": "address"})
+    inputFiles.append({"fileName": "panama_papers.nodes.entity.csv", "nodeDatabase": "panama", "nodeType": "entity"})
+    inputFiles.append({"fileName": "panama_papers.nodes.intermediary.csv", "nodeDatabase": "panama", "nodeType": "intermediary"})
+    inputFiles.append({"fileName": "panama_papers.nodes.officer.csv", "nodeDatabase": "panama", "nodeType": "officer"})
+    inputFiles.append({"fileName": "paradise_papers.nodes.address.csv", "nodeDatabase": "paradise", "nodeType": "address"})
+    inputFiles.append({"fileName": "paradise_papers.nodes.entity.csv", "nodeDatabase": "paradise", "nodeType": "entity"})
+    inputFiles.append({"fileName": "paradise_papers.nodes.intermediary.csv", "nodeDatabase": "paradise", "nodeType": "intermediary"})
+    inputFiles.append({"fileName": "paradise_papers.nodes.officer.csv", "nodeDatabase": "paradise", "nodeType": "officer"})
+    inputFiles.append({"fileName": "paradise_papers.nodes.other.csv", "nodeDatabase": "paradise", "nodeType": "other"})
     #--ensure edges files are last as views created on them require prior files
-    inputFiles.append({"fileName": "bahamas_leaks.edges.csv", "ijicSource": "bahamas", "nodeType":"edges"})
-    inputFiles.append({"fileName": "offshore_leaks.edges.csv", "ijicSource": "offshore", "nodeType": "edges"})
-    inputFiles.append({"fileName": "panama_papers.edges.csv", "ijicSource": "panama", "nodeType": "edges"})
-    inputFiles.append({"fileName": "paradise_papers.edges.csv", "ijicSource": "paradise", "nodeType": "edges"})
+    inputFiles.append({"fileName": "bahamas_leaks.edges.csv", "nodeDatabase": "bahamas", "nodeType":"edges"})
+    inputFiles.append({"fileName": "offshore_leaks.edges.csv", "nodeDatabase": "offshore", "nodeType": "edges"})
+    inputFiles.append({"fileName": "panama_papers.edges.csv", "nodeDatabase": "panama", "nodeType": "edges"})
+    inputFiles.append({"fileName": "paradise_papers.edges.csv", "nodeDatabase": "paradise", "nodeType": "edges"})
     #--create a table name for each file
     for i in range(len(inputFiles)):
-        inputFiles[i]['tableName'] = inputFiles[i]['ijicSource'] + '_' + inputFiles[i]['nodeType']
+        inputFiles[i]['tableName'] = inputFiles[i]['nodeDatabase'] + '_' + inputFiles[i]['nodeType']
 
     #--open database connection and load from csv if first time
     dbname = inputPath + (os.path.sep if inputPath[-1:] != os.path.sep else '') + 'ijic.db'
@@ -489,7 +461,7 @@ if __name__ == '__main__':
 
     #--process each table
     for fileDict in inputFiles:
-        if (fileDict['ijicSource'] == ijicSource.lower() or ijicSource.upper() == 'ALL') and (fileDict['nodeType'] == nodeType.lower() or nodeType.upper() == 'ALL'):
+        if (fileDict['nodeDatabase'] == nodeDatabase.lower() or nodeDatabase.upper() == 'ALL') and (fileDict['nodeType'] == nodeType.lower() or nodeType.upper() == 'ALL'):
             processTable(fileDict)
             if shutDown:
                 break
@@ -497,11 +469,12 @@ if __name__ == '__main__':
     outputFileHandle.close()
 
     #--write statistics file
-    if statisticsFile: 
+    if logFile: 
         print('')
-        with open(statisticsFile, 'w') as outfile:
+        statPack['BASE_LIBRARY'] = baseLibrary.statPack
+        with open(logFile, 'w') as outfile:
             json.dump(statPack, outfile, indent=4, sort_keys = True)    
-        print('Mapping stats written to %s' % statisticsFile)
+        print('Mapping stats written to %s' % logFile)
 
     print('')
     elapsedMins = round((time.time() - procStartTime) / 60, 1)
