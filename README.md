@@ -81,7 +81,10 @@ python3 G2ConfigTool.py <path-to-file>/ijic_config_updates.json
 This will step you through the process of adding the data sources, entity types, features, attributes and other settings needed to load this watch list data into Senzing. After each command you will see a status message saying "success" or "already exists".  For instance, if you run the script twice, the second time through they will all say "already exists" which is OK.
 
 Configuration updates include:
-- addDataSource **IJIC**
+- addDataSource **IJIC-PANAMA**
+- addDataSource **IJIC-PARADISE**
+- addDataSource **IJIC-BAHAMAS**
+- addDataSource **IJIC-OFFSHORE**
 - addEntityType **PERSON**
 - addEntityType **ORGANIZATION**
 
