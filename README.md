@@ -25,8 +25,6 @@ optional arguments:
                         path to the downloaded IJIC csv files.
   -o OUTPUT_FILE, --output_file OUTPUT_FILE
                         path and file name for the json output.
-  -b BASE_LIBRARY_PATH, --base_library_path BASE_LIBRARY_PATH
-                        path to the base library files.
   -l LOG_FILE, --log_file LOG_FILE
                         optional statistics filename (json format).
   -d DATABASE, --database DATABASE
@@ -52,8 +50,8 @@ optional arguments:
 
 ### Prerequisites
 - python 3.6 or higher
-- pandas (pip3 install pandas)
 - Senzing API version 1.7 or higher
+- pandas (pip3 install pandas)
 - https://github.com/Senzing/mapper-base
 
 ### Installation
@@ -66,6 +64,10 @@ Place the the following files on a directory of your choice ...
 ```Console
 /senzing/mappers/mapper-base
 /senzing/mappers/mapper-ijic         <--
+```
+You will also need to set the PYTHONPATH to where the base mappers as follows ...
+```Console
+export PYTHONPATH=$PYTHONPATH:<path to mapper-base project>
 ```
 
 ### Configuring Senzing
@@ -125,7 +127,7 @@ There are 4 zip files containing the files listed below. Its best just to unzip 
 
 The mapper will read all the files and create one output file.  Example usage:
 ```console
-python3 ijic_mapper.py -i ./input -o ./output/ijic_2018.json -b ../mapper-base -l ijic_stats.json
+python3 ijic_mapper.py -i ./input -o ./output/ijic_2018.json -l ijic_stats.json
 ```
 - Add the -d parameter if you just want to map one of the 4 databases from IJIC (panama, paradise, bahamas or offshore).
 - Add the -t parameter if you just want to map one of the 3 node_types from IJIC (entity, intermediary, or officer).

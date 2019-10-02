@@ -11,6 +11,18 @@ import re
 import pandas
 import sqlite3
 
+#--import the base mapper library and variants
+try: 
+    import base_mapper
+except: 
+    print('')
+    print('Please export PYTHONPATH=$PYTHONPATH:<path to mapper-base project>')
+    print('')
+    sys.exit(1)
+baseLibrary = base_mapper.base_library(os.path.abspath(base_mapper.__file__).replace('base_mapper.py','base_variants.json'))
+if not baseLibrary.initialized:
+    sys.exit(1)
+
 #----------------------------------------
 def pause(question='PRESS ENTER TO CONTINUE ...'):
     """ pause for debug purposes """
@@ -182,7 +194,7 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
     
     #--set the data source
     jsonData = {}
-    jsonData['DATA_SOURCE'] = 'IJIC' + '-' + nodeDatabase
+    jsonData['DATA_SOURCE'] = 'IJIC' + '-' + nodeDatabase.upper()
     jsonData['RECORD_ID'] = str(nodeRecord['node_id'])
 
     #--cleanup the name ("the bearer" is like "unknown")
@@ -361,43 +373,21 @@ if __name__ == '__main__':
     progressInterval = 10000
 
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('-i', '--input_path', default=os.getenv('input_path'.upper(), None), type=str, help='path to the downloaded IJIC csv files.')
-    argparser.add_argument('-o', '--output_file', default=os.getenv('output_file'.upper(), None), type=str, help='path and file name for the json output.')
-    argparser.add_argument('-b', '--base_library_path', default=os.getenv('base_library_path'.upper(), None), type=str, help='path to the base library files.')
-    argparser.add_argument('-l', '--log_file', default=os.getenv('log_file'.upper(), None), type=str, help='optional statistics filename (json format).')
-    argparser.add_argument('-d', '--database', default=os.getenv('database'.upper(), 'ALL'), type=str, help='choose: panama, bahamas, paradise, offshore or all, default=all')
-    argparser.add_argument('-t', '--node_type', default=os.getenv('node_type'.upper(), 'ALL'), type=str, help='choose: entity, intermediary, officer or all, default=all')
-    argparser.add_argument('-nr', '--no_relationships', default=os.getenv('no_relationships'.upper(), False), action='store_true', help='do not create disclosed relationships, an attribute will still be stored')
-    argparser.add_argument('-R', '--reload_csvs', default=os.getenv('reload_csvs'.upper(), False), action='store_true', help='reload from csvs, don\'t use cached data.')
+    argparser.add_argument('-i', '--input_path', default=os.getenv('input_path', None), type=str, help='path to the downloaded IJIC csv files.')
+    argparser.add_argument('-o', '--output_file', default=os.getenv('output_file', None), type=str, help='path and file name for the json output.')
+    argparser.add_argument('-l', '--log_file', default=os.getenv('log_file', None), type=str, help='optional statistics filename (json format).')
+    argparser.add_argument('-d', '--database', default=os.getenv('database', 'ALL'), type=str, help='choose: panama, bahamas, paradise, offshore or all (default=all)')
+    argparser.add_argument('-t', '--node_type', default=os.getenv('node_type', 'ALL'), type=str, help='choose: entity, intermediary, officer or all (default=all)')
+    argparser.add_argument('-nr', '--no_relationships', default=os.getenv('no_relationships', False), action='store_true', help='do not create disclosed relationships')
+    argparser.add_argument('-R', '--reload_csvs', default=os.getenv('reload_csvs', False), action='store_true', help='reload from csvs, don\'t use cached data')
     args = argparser.parse_args()
     inputPath = args.input_path
     outputFileName = args.output_file
-    baseLibraryPath = args.base_library_path
     logFile = args.log_file
     nodeDatabase = args.database.lower() if args.database else None
     nodeType = args.node_type.lower() if args.node_type else None
     noRelationships = args.no_relationships
     reloadFromCsvs = args.reload_csvs
-
-    #--initialize the base library
-    if not (baseLibraryPath):
-        print('')
-        print('Please supply the path to the base library project.')
-        print('')
-        sys.exit(1)
-    baseLibraryPath = os.path.abspath(baseLibraryPath)
-    baseLibraryFile = baseLibraryPath + os.path.sep + 'base_mapper.py'
-    baseVariantFile = baseLibraryPath + os.path.sep + 'base_variants.json'
-    if not os.path.exists(baseLibraryFile) or not os.path.exists(baseVariantFile):
-        print('')
-        print('standardization library files missing from %s.' % baseLibraryPath)
-        print('')
-        sys.exit(1)
-    sys.path.insert(1, baseLibraryPath)
-    from base_mapper import base_library
-    baseLibrary = base_library(baseVariantFile)
-    if not baseLibrary.initialized:
-        sys.exit(1)
 
     if not (inputPath):
         print('')
