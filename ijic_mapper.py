@@ -373,13 +373,13 @@ if __name__ == '__main__':
     progressInterval = 10000
 
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('-i', '--input_path', default=os.getenv('input_path', None), type=str, help='path to the downloaded IJIC csv files.')
-    argparser.add_argument('-o', '--output_file', default=os.getenv('output_file', None), type=str, help='path and file name for the json output.')
-    argparser.add_argument('-l', '--log_file', default=os.getenv('log_file', None), type=str, help='optional statistics filename (json format).')
-    argparser.add_argument('-d', '--database', default=os.getenv('database', 'ALL'), type=str, help='choose: panama, bahamas, paradise, offshore or all (default=all)')
-    argparser.add_argument('-t', '--node_type', default=os.getenv('node_type', 'ALL'), type=str, help='choose: entity, intermediary, officer or all (default=all)')
-    argparser.add_argument('-nr', '--no_relationships', default=os.getenv('no_relationships', False), action='store_true', help='do not create disclosed relationships')
-    argparser.add_argument('-R', '--reload_csvs', default=os.getenv('reload_csvs', False), action='store_true', help='reload from csvs, don\'t use cached data')
+    argparser.add_argument('-i', '--input_path', default=os.getenv('input_path'.upper(), None), type=str, help='path to the downloaded IJIC csv files.')
+    argparser.add_argument('-o', '--output_file', default=os.getenv('output_file'.upper(), None), type=str, help='path and file name for the json output.')
+    argparser.add_argument('-l', '--log_file', default=os.getenv('log_file'.upper(), None), type=str, help='optional statistics filename (json format).')
+    argparser.add_argument('-d', '--database', default=os.getenv('database'.upper(), 'ALL'), type=str, help='choose: panama, bahamas, paradise, offshore or all (default=all)')
+    argparser.add_argument('-t', '--node_type', default=os.getenv('node_type'.upper(), 'ALL'), type=str, help='choose: entity, intermediary, officer or all (default=all)')
+    argparser.add_argument('-nr', '--no_relationships', default=False, action='store_true', help='do not create disclosed relationships')
+    argparser.add_argument('-R', '--reload_csvs', default=False, action='store_true', help='reload from csvs, don\'t use cached data')
     args = argparser.parse_args()
     inputPath = args.input_path
     outputFileName = args.output_file
