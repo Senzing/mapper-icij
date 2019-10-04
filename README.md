@@ -3,20 +3,20 @@
 ## Overview
 
 The [ijic_mapper.py](ijic_mapper.py) python script converts the ICIJ: International Consortium of Investigative Journalists
-csv files to json files ready to load into senzing.  This includes the ...
+csv files to json files ready to load into Senzing.  This includes the ...
 - Panama Papers 
 - Paradise Papers
 - Bahamas Leaks
 - Offshore Leaks
 
 Loading IJIC data into Senzing requires additional features and configurations. These are contained in the 
-[ijic_config_updates.json](ijic_config_updates.json) file and are applied with the [G2ConfigTool.py](G2ConfigTool.py) also contained in this project.
+[ijic_config_updates.json](ijic_config_updates.json) file.
 
 Usage:
 ```console
 python ijic_mapper.py --help
 usage: ijic_mapper.py [-h] [-i INPUT_PATH] [-o OUTPUT_FILE]
-                      [-b BASE_LIBRARY_PATH] [-l LOG_FILE] [-d DATABASE]
+                      [-l LOG_FILE] [-d DATABASE]
                       [-t NODE_TYPE] [-nr] [-R]
 
 optional arguments:
@@ -65,20 +65,18 @@ Place the the following files on a directory of your choice ...
 /senzing/mappers/mapper-base
 /senzing/mappers/mapper-ijic         <--
 ```
-You will also need to set the PYTHONPATH to where the base mapper is as follows ...
+You will also need to set the PYTHONPATH to where the base mapper is as follows ... (assumuing the directory structure above)
 ```Console
-export PYTHONPATH=$PYTHONPATH:<path to mapper-base project>
+export PYTHONPATH=$PYTHONPATH:/senzing/mappers/mapper-base
 ```
 
 ### Configuring Senzing
 
 *Note:* This only needs to be performed one time! In fact you may want to add these configuration updates to a master configuration file for all your data sources.
 
-**If you are on version G2 API version 1.10 or prior**, update the G2ConfigTool.py program file on the /opt/senzing/g2/python directory with this one ... [G2ConfigTool.py](G2ConfigTool.py)
-
-Then from the /opt/senzing/g2/python directory ...
+From the /opt/senzing/g2/python directory ...
 ```console
-python3 G2ConfigTool.py <path-to-file>/ijic_config_updates.json
+python3 G2ConfigTool.py <path-to-file>/dnb_config_updates.json
 ```
 This will step you through the process of adding the data sources, entity types, features, attributes and other settings needed to load this watch list data into Senzing. After each command you will see a status message saying "success" or "already exists".  For instance, if you run the script twice, the second time through they will all say "already exists" which is OK.
 
