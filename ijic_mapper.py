@@ -11,7 +11,7 @@ import re
 import pandas
 import sqlite3
 
-#--import the base mapper library and variants
+#--try to import the base mapper library and variants
 try: 
     import base_mapper
 except: 
@@ -103,12 +103,12 @@ def csv2db():
                     sql += "  case when c.node_id is null then "
                     sql += "   case when d.node_id is null then "
                     sql += "    case when e.node_id is null then null " 
-                    sql += "     else e.address end " 
+                    sql += "     else case when e.name is null then e.address else e.name end end "
                     sql += "    else d.name end "
                     sql += "   else c.name end "
                     sql += "  else b.name end as node1_desc, "
                     sql += " a.%s as rel_type, " % (relTypeField,)
-                    sql += " a.%s as node_2, " % (node2Field)
+                    sql += " a.%s as node_2, " % (node2Field,)
                     sql += " case when f.node_id is null then "
                     sql += "  case when g.node_id is null then "
                     sql += "   case when h.node_id is null then "
@@ -121,7 +121,7 @@ def csv2db():
                     sql += "  case when g.node_id is null then "
                     sql += "   case when h.node_id is null then "
                     sql += "    case when i.node_id is null then null "
-                    sql += "     else i.address end " 
+                    sql += "     else case when i.name is null then i.address else i.name end end "
                     sql += "    else h.name end "
                     sql += "   else g.name end "
                     sql += "  else f.name end as node2_desc, "
@@ -218,14 +218,14 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
     updateStat('NODE_TYPE', nodeType.upper())
 
     if 'jurisdiction' in nodeRecord and nodeRecord['jurisdiction']:
-        jsonData['Jurisdiction_country'] = nodeRecord['jurisdiction']
+        jsonData['COUNTRY_OF_ASSOCIATION_JURISDICTION'] = nodeRecord['jurisdiction']
     if 'jurisdiction_description' in nodeRecord and nodeRecord['jurisdiction_description']:
         jsonData['Jurisdiction_description'] = nodeRecord['jurisdiction_description']
 
     if 'country_codes' in nodeRecord and nodeRecord['country_codes']:
         instance = 0
         for linkedCountry in nodeRecord['country_codes'].split(';'):
-            jsonData['Linked_country%s' % (('_' + str(instance)) if instance > 0 else '')] = linkedCountry
+            jsonData['COUNTRY_OF_ASSOCIATION_LINKED%s' % (('_' + str(instance)) if instance > 0 else '')] = linkedCountry
             instance += 1
     if 'countries' in nodeRecord and nodeRecord['countries']:
         jsonData['Linked_country_names'] = nodeRecord['countries']
@@ -249,9 +249,9 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
     #--entities and intermediaries used to have addresses, left here just in case they come back
     #--just store the list here, there may be related address nodes (usually duplicates of these!)
     addressList = []
-    if 'address' in nodeRecord and nodeRecord['address']:  #--multiples separated by ; 
-        addressList = nodeRecord['address'].split(';')
- 
+    if 'address' in nodeRecord and nodeRecord['address']: 
+        addressList = nodeRecord['address']
+
     #--split related nodes into addresses or disclosed relationships
     #--note the relationship records are one sided, must look for this entity on either side
     officerOfList = []
@@ -265,10 +265,9 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
         edgeRecord = dict(zip(edgeHeader, edgeRow))
 
         #--map the related node as an address
-        if edgeRecord['node_1'] == nodeRecord['node_id'] and edgeRecord['rel_type'] == 'registered_address':
-            if edgeRecord['node2_type'] == 'address': #--should always be true
-                if edgeRecord['node2_desc'] not in addressList:
-                    addressList.append(edgeRecord['node2_desc'])
+        if edgeRecord['node_1'] == nodeRecord['node_id'] and edgeRecord['node2_type'] == 'address':
+            if edgeRecord['node2_desc'] not in addressList:
+                addressList.append(edgeRecord['node2_desc'])
 
         #--map the related node as a disclosed relationship
         else:
@@ -355,7 +354,8 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
                 jsonData['RELATIONSHIP_LIST'] = subList
 
     #--add watch_list keys
-    jsonData = baseLibrary.jsonUpdater(jsonData)
+    if addCompositeKeys:
+        jsonData = baseLibrary.jsonUpdater(jsonData)
 
     #print(json.dumps(jsonData, indent=4, sort_keys=True))
     #pause()
@@ -379,6 +379,7 @@ if __name__ == '__main__':
     argparser.add_argument('-d', '--database', default=os.getenv('database'.upper(), 'ALL'), type=str, help='choose: panama, bahamas, paradise, offshore or all (default=all)')
     argparser.add_argument('-t', '--node_type', default=os.getenv('node_type'.upper(), 'ALL'), type=str, help='choose: entity, intermediary, officer or all (default=all)')
     argparser.add_argument('-nr', '--no_relationships', default=False, action='store_true', help='do not create disclosed relationships')
+    argparser.add_argument('-ck', '--add_composite_keys', default=False, action='store_true', help='add composite keys, not needed from v1.13 on')
     argparser.add_argument('-R', '--reload_csvs', default=False, action='store_true', help='reload from csvs, don\'t use cached data')
     args = argparser.parse_args()
     inputPath = args.input_path
@@ -387,17 +388,20 @@ if __name__ == '__main__':
     nodeDatabase = args.database.lower() if args.database else None
     nodeType = args.node_type.lower() if args.node_type else None
     noRelationships = args.no_relationships
+    addCompositeKeys = args.add_composite_keys
     reloadFromCsvs = args.reload_csvs
 
     if not (inputPath):
         print('')
         print('Please supply the path to the downloaded IJIC csv files.')
         print('')
+        sys.exit(1)
 
     if not (outputFileName):
         print('')
         print('Please supply an output file name.')
         print('')
+        sys.exit(1)
 
     #--open output file
     try: outputFileHandle = open(outputFileName, "w", encoding='utf-8')
