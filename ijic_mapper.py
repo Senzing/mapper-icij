@@ -194,7 +194,7 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
     
     #--set the data source
     jsonData = {}
-    jsonData['DATA_SOURCE'] = 'IJIC' + '-' + nodeDatabase.upper()
+    jsonData['DATA_SOURCE'] = 'IJIC'
     jsonData['RECORD_ID'] = str(nodeRecord['node_id'])
 
     #--cleanup the name ("the bearer" is like "unknown")
@@ -211,25 +211,22 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
         jsonData['ENTITY_TYPE'] = 'ORGANIZATION'
         jsonData['PRIMARY_NAME_ORG'] = entityName
     jsonData['RECORD_TYPE'] = jsonData['ENTITY_TYPE']
-    jsonData['Node_type'] = nodeType.upper()
+    jsonData['ijic_source'] = nodeDatabase.upper()
+    jsonData['ijic_type'] = nodeType.upper()
 
     updateStat('DATA_SOURCE', jsonData['DATA_SOURCE'])
     updateStat('ENTITY_TYPE', jsonData['ENTITY_TYPE'])
+    updateStat('NODE_SOURCE', nodeDatabase.upper())
     updateStat('NODE_TYPE', nodeType.upper())
 
+    countryList = []
     if 'jurisdiction' in nodeRecord and nodeRecord['jurisdiction']:
-        jsonData['COUNTRY_OF_ASSOCIATION_JURISDICTION'] = nodeRecord['jurisdiction']
-    if 'jurisdiction_description' in nodeRecord and nodeRecord['jurisdiction_description']:
-        jsonData['Jurisdiction_description'] = nodeRecord['jurisdiction_description']
-
+        countryList.append({'JURISDICTION_COUNTRY_OF_ASSOCIATION': nodeRecord['jurisdiction']})
     if 'country_codes' in nodeRecord and nodeRecord['country_codes']:
-        instance = 0
         for linkedCountry in nodeRecord['country_codes'].split(';'):
-            jsonData['COUNTRY_OF_ASSOCIATION_LINKED%s' % (('_' + str(instance)) if instance > 0 else '')] = linkedCountry
-            instance += 1
-    if 'countries' in nodeRecord and nodeRecord['countries']:
-        jsonData['Linked_country_names'] = nodeRecord['countries']
-
+            countryList.append({'LINKED_COUNTRY_OF_ASSOCIATION': linkedCountry})
+    if countryList:
+        jsonData['COUNTRIES'] = countryList
 
     if 'status' in nodeRecord and nodeRecord['status']:  #--officers don't have status
         jsonData['Status'] = nodeRecord['status']
@@ -294,7 +291,7 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
             if len(subList) == 1:
                 jsonData.update(subList[0])
             else:
-                jsonData['ADDRESS_LIST'] = subList
+                jsonData['ADDRESSES'] = subList
         
     #--create officer of attribute list
     if officerOfList and jsonData['ENTITY_TYPE'] == 'PERSON':
@@ -351,7 +348,7 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
             if len(subList) == 1:
                 jsonData.update(subList[0])
             else:
-                jsonData['RELATIONSHIP_LIST'] = subList
+                jsonData['RELATIONSHIPS'] = subList
 
     #--add watch_list keys
     if addCompositeKeys:
@@ -378,8 +375,6 @@ if __name__ == '__main__':
     argparser.add_argument('-l', '--log_file', default=os.getenv('log_file'.upper(), None), type=str, help='optional statistics filename (json format).')
     argparser.add_argument('-d', '--database', default=os.getenv('database'.upper(), 'ALL'), type=str, help='choose: panama, bahamas, paradise, offshore or all (default=all)')
     argparser.add_argument('-t', '--node_type', default=os.getenv('node_type'.upper(), 'ALL'), type=str, help='choose: entity, intermediary, officer or all (default=all)')
-    argparser.add_argument('-nr', '--no_relationships', default=False, action='store_true', help='do not create disclosed relationships')
-    argparser.add_argument('-ck', '--add_composite_keys', default=False, action='store_true', help='add composite keys, not needed from v1.13 on')
     argparser.add_argument('-R', '--reload_csvs', default=False, action='store_true', help='reload from csvs, don\'t use cached data')
     args = argparser.parse_args()
     inputPath = args.input_path
@@ -387,9 +382,11 @@ if __name__ == '__main__':
     logFile = args.log_file
     nodeDatabase = args.database.lower() if args.database else None
     nodeType = args.node_type.lower() if args.node_type else None
-    noRelationships = args.no_relationships
-    addCompositeKeys = args.add_composite_keys
     reloadFromCsvs = args.reload_csvs
+
+    #--deprecated parameters
+    noRelationships = False
+    addCompositeKeys = False
 
     if not (inputPath):
         print('')

@@ -19,7 +19,7 @@ Usage:
 python ijic_mapper.py --help
 usage: ijic_mapper.py [-h] [-i INPUT_PATH] [-o OUTPUT_FILE]
                       [-l LOG_FILE] [-d DATABASE]
-                      [-t NODE_TYPE] [-nr] [-R]
+                      [-t NODE_TYPE] [-R]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -35,11 +35,6 @@ optional arguments:
   -t NODE_TYPE, --node_type NODE_TYPE
                         choose: entity, intermediary, officer or all,
                         default=all
-  -nr, --no_relationships
-                        do not create disclosed relationships, an attribute
-                        will still be stored
-  -ck, --add_composite_keys
-                        add composite keys, not needed from v1.13 on
   -R, --reload_csvs     reload from csvs, don't use cached data.
 ```
 
@@ -55,7 +50,7 @@ optional arguments:
 ### Prerequisites
 
 - python 3.6 or higher
-- Senzing API version 1.7 or higher
+- Senzing API version 1.13 or higher
 - pandas (pip3 install pandas)
 - [Senzing/mapper-base](https://github.com/Senzing/mapper-base)
 
@@ -86,7 +81,7 @@ export PYTHONPATH=$PYTHONPATH:/senzing/mappers/mapper-base
 From the /opt/senzing/g2/python directory ...
 
 ```console
-python3 G2ConfigTool.py <path-to-file>/dnb_config_updates.json
+python3 G2ConfigTool.py <path-to-file>/ijic_config_updates.json
 ```
 
 This will step you through the process of adding the data sources, entity types, features, attributes and other settings needed to load this watch list data into Senzing. After each command you will see a status message saying "success" or "already exists".  For instance, if you run the script twice, the second time through they will all say "already exists" which is OK.
