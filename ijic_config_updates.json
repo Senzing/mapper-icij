@@ -1,7 +1,4 @@
-addDataSource IJIC-PANAMA
-addDataSource IJIC-PARADISE
-addDataSource IJIC-BAHAMAS
-addDataSource IJIC-OFFSHORE
+addDataSource IJIC
 
 addEntityType PERSON
 addEntityType ORGANIZATION
