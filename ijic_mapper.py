@@ -78,10 +78,12 @@ def csv2db():
                 else:
                     if fileDict['nodeDatabase'] in ['bahamas']:
                         relTypeField = 'rel_type'
+                        relTypeField1 = None
                         node1Field = 'node_1'
                         node2Field = 'node_2'
                     else:
                         relTypeField = 'TYPE'
+                        relTypeField1 = 'link'
                         node1Field = 'START_ID'
                         node2Field = 'END_ID'
 
@@ -107,7 +109,9 @@ def csv2db():
                     sql += "    else d.name end "
                     sql += "   else c.name end "
                     sql += "  else b.name end as node1_desc, "
-                    sql += " a.%s as rel_type, " % (relTypeField,)
+                    sql += " a.%s as rel_type, " % relTypeField
+                    if relTypeField1:
+                        sql += " a.%s as rel_type1, " % relTypeField1
                     sql += " a.%s as node_2, " % (node2Field,)
                     sql += " case when f.node_id is null then "
                     sql += "  case when g.node_id is null then "
@@ -199,9 +203,9 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
 
     #--cleanup the name ("the bearer" is like "unknown")
     entityName = nodeRecord['name'] if 'name' in nodeRecord and nodeRecord['name'] else ''
-    if 'bearer' in entityName.lower():
-        jsonData['Name'] = entityName
-        entityName = ''
+    #if 'bearer' in entityName.lower():
+    #    jsonData['Name'] = entityName
+    #    entityName = ''
 
     #--not all officers are actually people!
     if nodeType.upper() == 'OFFICER' and not baseLibrary.isCompanyName(entityName):
@@ -314,6 +318,7 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
             if edgeRecord['logical_node2'] not in relationships:
                 relationships[edgeRecord['logical_node2']] = {}
                 relationships[edgeRecord['logical_node2']]['RELATED_REL_TYPE'] = edgeRecord['rel_type']
+                relationships[edgeRecord['logical_node2']]['RELATED_REL_TYPE1'] = edgeRecord['rel_type1'] if 'rel_type1' in edgeRecord else None
                 relationships[edgeRecord['logical_node2']]['RELATED_RECORD_ID'] = edgeRecord['logical_node2']
                 relationships[edgeRecord['logical_node2']]['RELATED_ENTITY_TYPE'] = edgeRecord['logical_type2']
                 relationships[edgeRecord['logical_node2']]['RELATED_RECORD_NAME'] = edgeRecord['logical_desc2']
@@ -337,11 +342,14 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
                 if relationships[relatedKey]['RELATED_REL_TYPE'] not in relTypeCounts:
                     relTypeCounts[relationships[relatedKey]['RELATED_REL_TYPE']] = 0
                 relTypeCounts[relationships[relatedKey]['RELATED_REL_TYPE']] += 1
-                relAttr = relationships[relatedKey]['RELATED_REL_TYPE'].upper() + '_' + str(relTypeCounts[relationships[relatedKey]['RELATED_REL_TYPE']])
+                if relationships[relatedKey]['RELATED_REL_TYPE1']:
+                    relAttr = relationships[relatedKey]['RELATED_REL_TYPE1'].upper() + '_' + str(relTypeCounts[relationships[relatedKey]['RELATED_REL_TYPE']])
+                else:
+                    relAttr = relationships[relatedKey]['RELATED_REL_TYPE'].upper() + '_' + str(relTypeCounts[relationships[relatedKey]['RELATED_REL_TYPE']])
                 jsonData[relAttr] = '%s (%s)' % (relationships[relatedKey]['RELATED_RECORD_ID'], relationships[relatedKey]['RELATED_RECORD_NAME'])
             else:
                 relatedRecord = {}
-                relatedRecord['RELATIONSHIP_TYPE'] = relationships[relatedKey]['RELATED_REL_TYPE']
+                relatedRecord['RELATIONSHIP_TYPE'] = relationships[relatedKey]['RELATED_REL_TYPE1'] if relationships[relatedKey]['RELATED_REL_TYPE1'] else relationships[relatedKey]['RELATED_REL_TYPE']
                 relatedRecord['RELATIONSHIP_KEY'] = '-'.join(sorted([str(relationships[relatedKey]['RELATED_RECORD_ID']), str(nodeRecord['node_id'])]))
                 subList.append(relatedRecord)
         if subList:
