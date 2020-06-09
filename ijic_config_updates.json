@@ -4,4 +4,3 @@ addEntityType PERSON
 addEntityType ORGANIZATION
 
 save
-updateDatabase
