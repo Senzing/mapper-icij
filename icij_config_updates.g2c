@@ -1,4 +1,4 @@
-addDataSource IJIC
+addDataSource ICIJ
 
 addEntityType PERSON
 addEntityType ORGANIZATION

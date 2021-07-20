@@ -198,7 +198,7 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
     
     #--set the data source
     jsonData = {}
-    jsonData['DATA_SOURCE'] = 'IJIC'
+    jsonData['DATA_SOURCE'] = 'ICIJ'
     jsonData['RECORD_ID'] = str(nodeRecord['node_id'])
 
     #--cleanup the name ("the bearer" is like "unknown")
@@ -215,8 +215,8 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
         jsonData['ENTITY_TYPE'] = 'ORGANIZATION'
         jsonData['PRIMARY_NAME_ORG'] = entityName
     jsonData['RECORD_TYPE'] = jsonData['ENTITY_TYPE']
-    jsonData['ijic_source'] = nodeDatabase.upper()
-    jsonData['ijic_type'] = nodeType.upper()
+    jsonData['icij_source'] = nodeDatabase.upper()
+    jsonData['icij_type'] = nodeType.upper()
 
     updateStat('DATA_SOURCE', jsonData['DATA_SOURCE'])
     updateStat('ENTITY_TYPE', jsonData['ENTITY_TYPE'])
@@ -378,7 +378,7 @@ if __name__ == '__main__':
     progressInterval = 10000
 
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('-i', '--input_path', default=os.getenv('input_path'.upper(), None), type=str, help='path to the downloaded IJIC csv files.')
+    argparser.add_argument('-i', '--input_path', default=os.getenv('input_path'.upper(), None), type=str, help='path to the downloaded ICIJ csv files.')
     argparser.add_argument('-o', '--output_file', default=os.getenv('output_file'.upper(), None), type=str, help='path and file name for the json output.')
     argparser.add_argument('-l', '--log_file', default=os.getenv('log_file'.upper(), None), type=str, help='optional statistics filename (json format).')
     argparser.add_argument('-d', '--database', default=os.getenv('database'.upper(), 'ALL'), type=str, help='choose: panama, bahamas, paradise, offshore or all (default=all)')
@@ -398,7 +398,7 @@ if __name__ == '__main__':
 
     if not (inputPath):
         print('')
-        print('Please supply the path to the downloaded IJIC csv files.')
+        print('Please supply the path to the downloaded ICIJ csv files.')
         print('')
         sys.exit(1)
 
@@ -446,7 +446,7 @@ if __name__ == '__main__':
         inputFiles[i]['tableName'] = inputFiles[i]['nodeDatabase'] + '_' + inputFiles[i]['nodeType']
 
     #--open database connection and load from csv if first time
-    dbname = inputPath + (os.path.sep if inputPath[-1:] != os.path.sep else '') + 'ijic.db'
+    dbname = inputPath + (os.path.sep if inputPath[-1:] != os.path.sep else '') + 'icij.db'
     dbExists = os.path.exists(dbname)
     if reloadFromCsvs and dbExists:  #--purge and reload
         print('')
