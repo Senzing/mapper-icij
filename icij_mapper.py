@@ -78,11 +78,11 @@ def csv2db():
                 else:
                     if fileDict['nodeDatabase'] in ['bahamas']:
                         relTypeField = 'rel_type'
-                        relTypeField1 = None
+                        relTypeField1 = 'rel_type'
                         node1Field = 'node_1'
                         node2Field = 'node_2'
                     else:
-                        relTypeField = 'TYPE'
+                        relTypeField = 'link'
                         relTypeField1 = 'link'
                         node1Field = 'START_ID'
                         node2Field = 'END_ID'
@@ -152,7 +152,7 @@ def processTable(fileDict):
     tableName = fileDict['tableName']
     
     #--these aren't entities
-    if nodeType in ['edges', 'address', 'other']:
+    if nodeType in ['edges', 'other']:  #--'address', go ahead and load addresses as entities
         return 0
 
     print('')
@@ -211,6 +211,8 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
     if nodeType.upper() == 'OFFICER' and not baseLibrary.isCompanyName(entityName):
         jsonData['ENTITY_TYPE'] = 'PERSON'
         jsonData['PRIMARY_NAME_FULL'] = entityName
+    elif nodeType.upper() == 'ADDRESS': 
+        jsonData['ENTITY_TYPE'] = 'ADDRESS'
     else:
         jsonData['ENTITY_TYPE'] = 'ORGANIZATION'
         jsonData['PRIMARY_NAME_ORG'] = entityName
@@ -225,10 +227,14 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
 
     countryList = []
     if 'jurisdiction' in nodeRecord and nodeRecord['jurisdiction']:
-        countryList.append({'JURISDICTION_COUNTRY_OF_ASSOCIATION': nodeRecord['jurisdiction']})
+        jsonData['Jurisdiction'] = nodeRecord['jurisdiction']
+        countryList.append({'COUNTRY_OF_ASSOCIATION': nodeRecord['jurisdiction']})
     if 'country_codes' in nodeRecord and nodeRecord['country_codes']:
+        country_links = []
         for linkedCountry in nodeRecord['country_codes'].split(';'):
-            countryList.append({'LINKED_COUNTRY_OF_ASSOCIATION': linkedCountry})
+            country_links.append(linkedCountry)
+            countryList.append({'COUNTRY_OF_ASSOCIATION': linkedCountry})
+        nodeRecord['Linked to'] = ' | '.join(country_links)
     if countryList:
         jsonData['COUNTRIES'] = countryList
 
@@ -251,14 +257,17 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
     #--just store the list here, there may be related address nodes (usually duplicates of these!)
     addressList = []
     if 'address' in nodeRecord and nodeRecord['address']: 
-        addressList = nodeRecord['address']
+        addressList.append(nodeRecord['address'])
 
     #--split related nodes into addresses or disclosed relationships
     #--note the relationship records are one sided, must look for this entity on either side
     officerOfList = []
     edgeRecords = []
     edgeObj = conn.cursor()
-    edgeSql = 'select * from %s_edges_view where node_1 = %s or node_2 = %s' % (nodeDatabase, nodeRecord['node_id'], nodeRecord['node_id'])
+    if relationshipStyle == 2:
+        edgeSql = 'select * from %s_edges_view where node_1 = %s ' % (nodeDatabase, nodeRecord['node_id'])
+    else:
+        edgeSql = 'select * from %s_edges_view where node_1 = %s or node_2 = %s' % (nodeDatabase, nodeRecord['node_id'], nodeRecord['node_id'])
     edgeCursor = edgeObj.execute(edgeSql)        
     edgeHeader = [col[0] for col in edgeObj.description]
     edgeRow = edgeCursor.fetchone()
@@ -271,17 +280,17 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
                 addressList.append(edgeRecord['node2_desc'])
 
         #--map the related node as a disclosed relationship
-        else:
-            edgeRecord['logical_node2'] = edgeRecord['node_2'] if edgeRecord['node_1'] == nodeRecord['node_id'] else edgeRecord['node_1']
-            edgeRecord['logical_type2'] = edgeRecord['node2_type'] if edgeRecord['node_1'] == nodeRecord['node_id'] else edgeRecord['node1_type']
-            edgeRecord['logical_desc2'] = edgeRecord['node2_desc'] if edgeRecord['node_1'] == nodeRecord['node_id'] else edgeRecord['node1_desc']
-            edgeRecords.append(edgeRecord)
+        #else:  #--always map the 
+        edgeRecord['logical_node2'] = edgeRecord['node_2'] if edgeRecord['node_1'] == nodeRecord['node_id'] else edgeRecord['node_1']
+        edgeRecord['logical_type2'] = edgeRecord['node2_type'] if edgeRecord['node_1'] == nodeRecord['node_id'] else edgeRecord['node1_type']
+        edgeRecord['logical_desc2'] = edgeRecord['node2_desc'] if edgeRecord['node_1'] == nodeRecord['node_id'] else edgeRecord['node1_desc']
+        edgeRecords.append(edgeRecord)
 
-            #--also map the related node as a group name so can be used for matching
-            if edgeRecord['node_1'] == nodeRecord['node_id'] and edgeRecord['rel_type'] == 'officer_of':
-                if edgeRecord['node2_type'] == 'entity': #--should always be true
-                    if edgeRecord['node2_desc'] not in officerOfList:
-                        officerOfList.append(edgeRecord['node2_desc'])
+        #--also map the related node as a group name so can be used for matching
+        if edgeRecord['node_1'] == nodeRecord['node_id'] and edgeRecord['rel_type'] == 'officer_of':
+            if edgeRecord['node2_type'] == 'entity': #--should always be true
+                if edgeRecord['node2_desc'] not in officerOfList:
+                    officerOfList.append(edgeRecord['node2_desc'])
 
         edgeRow = edgeCursor.fetchone()
 
@@ -309,7 +318,13 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
             else:
                 jsonData['OFFICER_OF_LIST'] = subList
 
-	#--add the disclosed relationships, but summarize to eliminate duplication
+
+    #--add the anchor so that others can relate to this node
+    if relationshipStyle == 2:
+        jsonData['REL_ANCHOR_DOMAIN'] = 'ICIJ_ID'
+        jsonData['REL_ANCHOR_KEY'] = jsonData['RECORD_ID']
+
+    #--add the disclosed relationships, but summarize to eliminate duplication
     if edgeRecords:
 
         #--summarize (there are dupes!?)
@@ -338,25 +353,22 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
         relTypeCounts = {}
         subList = []
         for relatedKey in relationships:
-            if noRelationships:
-                if relationships[relatedKey]['RELATED_REL_TYPE'] not in relTypeCounts:
-                    relTypeCounts[relationships[relatedKey]['RELATED_REL_TYPE']] = 0
-                relTypeCounts[relationships[relatedKey]['RELATED_REL_TYPE']] += 1
-                if relationships[relatedKey]['RELATED_REL_TYPE1']:
-                    relAttr = relationships[relatedKey]['RELATED_REL_TYPE1'].upper() + '_' + str(relTypeCounts[relationships[relatedKey]['RELATED_REL_TYPE']])
-                else:
-                    relAttr = relationships[relatedKey]['RELATED_REL_TYPE'].upper() + '_' + str(relTypeCounts[relationships[relatedKey]['RELATED_REL_TYPE']])
-                jsonData[relAttr] = '%s (%s)' % (relationships[relatedKey]['RELATED_RECORD_ID'], relationships[relatedKey]['RELATED_RECORD_NAME'])
-            else:
+
+            #--new relationship strategy
+            if relationshipStyle == 2:
+                relatedRecord = {}
+                relatedRecord['REL_POINTER_DOMAIN'] = 'ICIJ_ID'
+                relatedRecord['REL_POINTER_KEY'] = relationships[relatedKey]['RELATED_RECORD_ID']
+                relatedRecord['REL_POINTER_ROLE'] = relationships[relatedKey]['RELATED_REL_TYPE']
+                subList.append(relatedRecord)
+            #--legacy
+            elif relationshipStyle == 1:
                 relatedRecord = {}
                 relatedRecord['RELATIONSHIP_TYPE'] = relationships[relatedKey]['RELATED_REL_TYPE1'] if relationships[relatedKey]['RELATED_REL_TYPE1'] else relationships[relatedKey]['RELATED_REL_TYPE']
                 relatedRecord['RELATIONSHIP_KEY'] = '-'.join(sorted([str(relationships[relatedKey]['RELATED_RECORD_ID']), str(nodeRecord['node_id'])]))
                 subList.append(relatedRecord)
         if subList:
-            if len(subList) == 1:
-                jsonData.update(subList[0])
-            else:
-                jsonData['RELATIONSHIPS'] = subList
+            jsonData['RELATIONSHIPS'] = subList
 
     #--add watch_list keys
     if addCompositeKeys:
@@ -383,6 +395,7 @@ if __name__ == '__main__':
     argparser.add_argument('-l', '--log_file', default=os.getenv('log_file'.upper(), None), type=str, help='optional statistics filename (json format).')
     argparser.add_argument('-d', '--database', default=os.getenv('database'.upper(), 'ALL'), type=str, help='choose: panama, bahamas, paradise, offshore or all (default=all)')
     argparser.add_argument('-t', '--node_type', default=os.getenv('node_type'.upper(), 'ALL'), type=str, help='choose: entity, intermediary, officer or all (default=all)')
+    argparser.add_argument('-r', '--relationship_style', dest='relationship_style', type=int, default=2, help='styles: 0=None, 1=Legacy linking, 2=Pointers (new for Senzing v1.15)')
     argparser.add_argument('-R', '--reload_csvs', default=False, action='store_true', help='reload from csvs, don\'t use cached data')
     args = argparser.parse_args()
     inputPath = args.input_path
@@ -390,6 +403,7 @@ if __name__ == '__main__':
     logFile = args.log_file
     nodeDatabase = args.database.lower() if args.database else None
     nodeType = args.node_type.lower() if args.node_type else None
+    relationshipStyle = args.relationship_style
     reloadFromCsvs = args.reload_csvs
 
     #--deprecated parameters
