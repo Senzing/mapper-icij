@@ -13,6 +13,11 @@ csv files to json files ready to load into Senzing.  This includes the ...
 Loading ICIJ data into Senzing requires additional features and configurations. These are contained in the
 [icij_config_updates.g2c](icij_config_updates.g2c) file.
 
+***Since the ICIJ data set is static, we have already run this mapper and made the mapped json file available 
+[here](https://public-read-access.s3.amazonaws.com/mapped-data-sets/icij-panama-papers/icij_2018.json.zip).
+You can simply download this file, unzip it and load it right into Senzing!  But don't forget to add the configuration 
+first as documented below!***
+
 Usage:
 
 ```console
