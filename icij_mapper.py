@@ -74,25 +74,26 @@ def csv2db():
                 df = pandas.read_csv(fileDict['fileName'], low_memory=False, encoding="latin-1", quotechar='"')
                 df.to_sql(fileDict['tableName'], conn, if_exists="replace")
                 if fileDict['nodeType'] != 'edges':
-                    conn.cursor().execute('create unique index ix_%s on %s (node_id, sourceID)' % (fileDict['tableName'], fileDict['tableName']))
+                    conn.cursor().execute('create index ix_%s on %s (_id)' % (fileDict['tableName'], fileDict['tableName']))
                 else:
-                    if fileDict['nodeDatabase'] in ['bahamas']:
-                        relTypeField = 'rel_type'
-                        relTypeField1 = 'rel_type'
-                        node1Field = 'node_1'
-                        node2Field = 'node_2'
-                    else:
-                        relTypeField = 'link'
-                        relTypeField1 = 'link'
-                        node1Field = 'START_ID'
-                        node2Field = 'END_ID'
+ 
+                    # note: in dec 2020, ICIJ released the Pandora Papers and went to a single database - 1 set of csv files for all
+                    #  the _start and _end fields in the edges table used to refer to the node_id in the node tables
+                    #  now they refer to the _id field in the node tables
 
-                    conn.cursor().execute('create index ix_%s1 on %s (%s, %s)' % (fileDict['tableName'], fileDict['tableName'], node1Field, node2Field))
-                    conn.cursor().execute('create index ix_%s2 on %s (%s, %s)' % (fileDict['tableName'], fileDict['tableName'], node2Field, node1Field))
+                    conn.cursor().execute('create index ix_%s1 on %s (_start)' % (fileDict['tableName'], fileDict['tableName']))
                     
                     sql = "create view %s_view as " % (fileDict['nodeDatabase'] + '_edges',)
                     sql += "select  "
-                    sql += " a.%s as node_1, " % (node1Field,)
+                    sql += " a._start, "
+                    sql += " case when b.node_id is null then "
+                    sql += "  case when c.node_id is null then "
+                    sql += "   case when d.node_id is null then "
+                    sql += "    case when e.node_id is null then null " 
+                    sql += "     else e.node_id end "
+                    sql += "    else d.node_id end "
+                    sql += "   else c.node_id end "
+                    sql += "  else b.node_id end as node1_id, "
                     sql += " case when b.node_id is null then "
                     sql += "  case when c.node_id is null then "
                     sql += "   case when d.node_id is null then "
@@ -109,10 +110,17 @@ def csv2db():
                     sql += "    else d.name end "
                     sql += "   else c.name end "
                     sql += "  else b.name end as node1_desc, "
-                    sql += " a.%s as rel_type, " % relTypeField
-                    if relTypeField1:
-                        sql += " a.%s as rel_type1, " % relTypeField1
-                    sql += " a.%s as node_2, " % (node2Field,)
+                    sql += " a._type, " 
+                    sql += " a.link, " 
+                    sql += " a._end, "
+                    sql += " case when f.node_id is null then "
+                    sql += "  case when g.node_id is null then "
+                    sql += "   case when h.node_id is null then "
+                    sql += "    case when i.node_id is null then null " 
+                    sql += "     else i.node_id end "
+                    sql += "    else h.node_id end "
+                    sql += "   else g.node_id end "
+                    sql += "  else f.node_id end as node2_id, "
                     sql += " case when f.node_id is null then "
                     sql += "  case when g.node_id is null then "
                     sql += "   case when h.node_id is null then "
@@ -132,14 +140,14 @@ def csv2db():
                     sql += " a.start_date, "
                     sql += " a.end_date "
                     sql += "from %s a "  % (fileDict['nodeDatabase'] + '_edges',)
-                    sql += "left join %s b on b.node_id = a.%s "  % (fileDict['nodeDatabase'] + '_entity', node1Field)
-                    sql += "left join %s c on c.node_id = a.%s "  % (fileDict['nodeDatabase'] + '_intermediary', node1Field)
-                    sql += "left join %s d on d.node_id = a.%s "  % (fileDict['nodeDatabase'] + '_officer', node1Field)
-                    sql += "left join %s e on e.node_id = a.%s "  % (fileDict['nodeDatabase'] + '_address', node1Field) 
-                    sql += "left join %s f on f.node_id = a.%s "  % (fileDict['nodeDatabase'] + '_entity', node2Field)
-                    sql += "left join %s g on g.node_id = a.%s "  % (fileDict['nodeDatabase'] + '_intermediary', node2Field)
-                    sql += "left join %s h on h.node_id = a.%s "  % (fileDict['nodeDatabase'] + '_officer', node2Field)
-                    sql += "left join %s i on i.node_id = a.%s "  % (fileDict['nodeDatabase'] + '_address', node2Field)
+                    sql += "left join %s b on b._id = a._start "  % (fileDict['nodeDatabase'] + '_entity', )
+                    sql += "left join %s c on c._id = a._start "  % (fileDict['nodeDatabase'] + '_intermediary', )
+                    sql += "left join %s d on d._id = a._start "  % (fileDict['nodeDatabase'] + '_officer', )
+                    sql += "left join %s e on e._id = a._start "  % (fileDict['nodeDatabase'] + '_address', ) 
+                    sql += "left join %s f on f._id = a._end "  % (fileDict['nodeDatabase'] + '_entity', )
+                    sql += "left join %s g on g._id = a._end "  % (fileDict['nodeDatabase'] + '_intermediary', )
+                    sql += "left join %s h on h._id = a._end "  % (fileDict['nodeDatabase'] + '_officer', )
+                    sql += "left join %s i on i._id = a._end "  % (fileDict['nodeDatabase'] + '_address', )
                     conn.cursor().execute(sql)
 
     return
@@ -148,11 +156,11 @@ def csv2db():
 def processTable(fileDict):
 
     nodeDatabase = fileDict['nodeDatabase']
-    nodeType = fileDict['nodeType']
+    nodeType = fileDict['nodeType'].upper()
     tableName = fileDict['tableName']
     
     #--these aren't entities
-    if nodeType in ['edges', 'other']:  #--'address', go ahead and load addresses as entities
+    if nodeType in ['EDGES']: #, 'other']:  #--'address', go ahead and load addresses as entities
         return 0
 
     print('')
@@ -171,7 +179,7 @@ def processTable(fileDict):
         msg = json.dumps(jsonData, ensure_ascii=False)
         #if len(msg) > 10000:
         #    print(msg)
-        #    pause()
+            #pause()
 
         try: outputFileHandle.write(msg + '\n')
         except IOError as err:
@@ -201,11 +209,10 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
     jsonData['DATA_SOURCE'] = 'ICIJ'
     jsonData['RECORD_ID'] = str(nodeRecord['node_id'])
 
-    #--cleanup the name ("the bearer" is like "unknown")
-    entityName = nodeRecord['name'] if 'name' in nodeRecord and nodeRecord['name'] else ''
-    #if 'bearer' in entityName.lower():
-    #    jsonData['Name'] = entityName
-    #    entityName = ''
+    entityName = nodeRecord.get('name', '')
+
+    #--the nodes files have a field for this, the address file doesn't
+    node_source = nodeRecord.get('sourceID', nodeDatabase)
 
     #--not all officers are actually people!
     if nodeType.upper() == 'OFFICER' and not baseLibrary.isCompanyName(entityName):
@@ -217,12 +224,12 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
         jsonData['ENTITY_TYPE'] = 'ORGANIZATION'
         jsonData['PRIMARY_NAME_ORG'] = entityName
     jsonData['RECORD_TYPE'] = jsonData['ENTITY_TYPE']
-    jsonData['icij_source'] = nodeDatabase.upper()
-    jsonData['icij_type'] = nodeType.upper()
+    jsonData['ICIJ_SOURCE'] = node_source
+    jsonData['NODE_TYPE'] = nodeType
 
     updateStat('DATA_SOURCE', jsonData['DATA_SOURCE'])
     updateStat('ENTITY_TYPE', jsonData['ENTITY_TYPE'])
-    updateStat('NODE_SOURCE', nodeDatabase.upper())
+    updateStat('SOURCE', node_source)
     updateStat('NODE_TYPE', nodeType.upper())
 
     countryList = []
@@ -243,139 +250,71 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
 
     #--only entities have these
     if 'company_type' in nodeRecord and nodeRecord['company_type']:
-        jsonData['Company type'] = nodeRecord['company_type']
+        jsonData['COMPANY_TYPE'] = nodeRecord['company_type']
     if 'incorporation_date' in nodeRecord and nodeRecord['incorporation_date']:
-        jsonData['Incorporated'] = nodeRecord['incorporation_date']
+        jsonData['INCORPORATED'] = nodeRecord['incorporation_date']
     if 'inactivation_date' in nodeRecord and nodeRecord['inactivation_date']:
-        jsonData['Inactivated'] = nodeRecord['inactivation_date']
+        jsonData['INACTIVATED'] = nodeRecord['inactivation_date']
     if 'struck_off_date' in nodeRecord and nodeRecord['struck_off_date']:
-        jsonData['Struck off'] = nodeRecord['struck_off_date']
+        jsonData['STRUCK_OFF'] = nodeRecord['struck_off_date']
     if 'note' in nodeRecord and nodeRecord['note']:
-        jsonData['Notes'] = nodeRecord['note']
+        jsonData['NOTES'] = nodeRecord['note']
 
-    #--entities and intermediaries used to have addresses, left here just in case they come back
-    #--just store the list here, there may be related address nodes (usually duplicates of these!)
+    #--add the anchor so that others can relate to this node
+    jsonData['REL_ANCHOR_DOMAIN'] = 'ICIJ_ID'
+    jsonData['REL_ANCHOR_KEY'] = jsonData['RECORD_ID']
+
+    #--map related nodes as addresses, group associations and disclosed relationships
+    relPointerList = []
+    groupAssociationList = []
     addressList = []
     if 'address' in nodeRecord and nodeRecord['address']: 
-        addressList.append(nodeRecord['address'])
+        addressList.append({"ADDR_TYPE": "PRIMARY", "ADDR_FULL": nodeRecord['address']})
 
-    #--split related nodes into addresses or disclosed relationships
-    #--note the relationship records are one sided, must look for this entity on either side
-    officerOfList = []
-    edgeRecords = []
     edgeObj = conn.cursor()
-    if relationshipStyle == 2:
-        edgeSql = 'select * from %s_edges_view where node_1 = %s ' % (nodeDatabase, nodeRecord['node_id'])
-    else:
-        edgeSql = 'select * from %s_edges_view where node_1 = %s or node_2 = %s' % (nodeDatabase, nodeRecord['node_id'], nodeRecord['node_id'])
+    edgeSql = 'select * from %s_edges_view where _start = %s ' % (nodeDatabase, nodeRecord['_id'])
     edgeCursor = edgeObj.execute(edgeSql)        
     edgeHeader = [col[0] for col in edgeObj.description]
     edgeRow = edgeCursor.fetchone()
     while edgeRow:
         edgeRecord = dict(zip(edgeHeader, edgeRow))
 
-        #--map the related node as an address
-        if edgeRecord['node_1'] == nodeRecord['node_id'] and edgeRecord['node2_type'] == 'address':
+        #--map the relationship
+        relPointerRecord = {}
+        relPointerRecord['REL_POINTER_DOMAIN'] = 'ICIJ_ID'
+        relPointerRecord['REL_POINTER_KEY'] = edgeRecord['node2_id']
+        relPointerRecord['REL_POINTER_ROLE'] = edgeRecord['link']
+        if edgeRecord['start_date']:
+            relPointerRecord['REL_POINTER_FROM_DATE'] = edgeRecord['start_date']
+        if edgeRecord['end_date']:
+            relPointerRecord['REL_POINTER_THRU_DATE'] = edgeRecord['end_date']
+        relPointerList.append(relPointerRecord)
+
+        #--map the related node as an address if it is one
+        if edgeRecord['node2_type'] == 'address':
             if edgeRecord['node2_desc'] not in addressList:
-                addressList.append(edgeRecord['node2_desc'])
+                addrType = edgeRecord['link'].upper().replace(' ADDRESS', '')[0:50] if edgeRecord['link'] else 'ADDRESS'
+                addressRecord = {"ADDR_TYPE": addrType, "ADDR_FULL": edgeRecord['node2_desc']}
+                if addressRecord not in addressList:
+                    addressList.append(addressRecord)
 
-        #--map the related node as a disclosed relationship
-        #else:  #--always map the 
-        edgeRecord['logical_node2'] = edgeRecord['node_2'] if edgeRecord['node_1'] == nodeRecord['node_id'] else edgeRecord['node_1']
-        edgeRecord['logical_type2'] = edgeRecord['node2_type'] if edgeRecord['node_1'] == nodeRecord['node_id'] else edgeRecord['node1_type']
-        edgeRecord['logical_desc2'] = edgeRecord['node2_desc'] if edgeRecord['node_1'] == nodeRecord['node_id'] else edgeRecord['node1_desc']
-        edgeRecords.append(edgeRecord)
-
-        #--also map the related node as a group name so can be used for matching
-        if edgeRecord['node_1'] == nodeRecord['node_id'] and edgeRecord['rel_type'] == 'officer_of':
+        #--map the related node as a group name so can be used for matching if its an officer pointing to an entity
+        if jsonData['ENTITY_TYPE'] == 'PERSON' and edgeRecord['node2_type'] == 'entity':
             if edgeRecord['node2_type'] == 'entity': #--should always be true
-                if edgeRecord['node2_desc'] not in officerOfList:
-                    officerOfList.append(edgeRecord['node2_desc'])
+                groupAssociationRecord = {"GROUP_ASSOCIATION_ORG_NAME": edgeRecord['node2_desc']}
+                if groupAssociationRecord not in groupAssociationList:
+                    groupAssociationList.append(groupAssociationRecord)
 
         edgeRow = edgeCursor.fetchone()
 
-    #--add the addresses by turning the plain list into a list of mapped addresses
     if addressList:
-        subList = [] 
-        for i in range(len(addressList)):
-            if addressList[i] and type(addressList[i]) == str and len(addressList[i]) < 500 and addressList[i].upper().strip() not in ('NONE', 'NULL', '[NULL]'):
-                subList.append({"ADDR_FULL": addressList[i]})
-        if subList:
-            if len(subList) == 1:
-                jsonData.update(subList[0])
-            else:
-                jsonData['ADDRESSES'] = subList
-        
-    #--create officer of attribute list
-    if officerOfList and jsonData['ENTITY_TYPE'] == 'PERSON':
-        subList = []
-        for i in range(len(officerOfList)):
-            if officerOfList[i] and type(officerOfList[i]) == str and len(officerOfList[i]) < 500 and officerOfList[i].upper().strip() not in ('NONE', 'NULL', '[NULL]'):
-                subList.append({"GROUP_ASSOCIATION_ORG_NAME": officerOfList[i]})
-        if subList:
-            if len(subList) == 1:
-                jsonData.update(subList[0])
-            else:
-                jsonData['OFFICER_OF_LIST'] = subList
+        jsonData['ADDRESSES'] = addressList
 
+    if groupAssociationList and jsonData['ENTITY_TYPE'] == 'PERSON':
+        jsonData['GROUP_ASSOCATIONS'] = groupAssociationList
 
-    #--add the anchor so that others can relate to this node
-    if relationshipStyle == 2:
-        jsonData['REL_ANCHOR_DOMAIN'] = 'ICIJ_ID'
-        jsonData['REL_ANCHOR_KEY'] = jsonData['RECORD_ID']
-
-    #--add the disclosed relationships, but summarize to eliminate duplication
-    if edgeRecords:
-
-        #--summarize (there are dupes!?)
-        relationships = {}
-        for edgeRecord in edgeRecords:
-            if edgeRecord['logical_node2'] not in relationships:
-                relationships[edgeRecord['logical_node2']] = {}
-                relationships[edgeRecord['logical_node2']]['RELATED_REL_TYPE'] = edgeRecord['rel_type']
-                relationships[edgeRecord['logical_node2']]['RELATED_REL_TYPE1'] = edgeRecord['rel_type1'] if 'rel_type1' in edgeRecord else None
-                relationships[edgeRecord['logical_node2']]['RELATED_RECORD_ID'] = edgeRecord['logical_node2']
-                relationships[edgeRecord['logical_node2']]['RELATED_ENTITY_TYPE'] = edgeRecord['logical_type2']
-                relationships[edgeRecord['logical_node2']]['RELATED_RECORD_NAME'] = edgeRecord['logical_desc2']
-                relationships[edgeRecord['logical_node2']]['RELATED_FROM_DATE'] = baseLibrary.formatDate(edgeRecord['start_date']) if baseLibrary.formatDate(edgeRecord['start_date']) else ''
-                relationships[edgeRecord['logical_node2']]['RELATED_THRU_DATE'] = baseLibrary.formatDate(edgeRecord['end_date']) if baseLibrary.formatDate(edgeRecord['end_date']) else ''
-            else:
-                if relationships[edgeRecord['logical_node2']]['RELATED_REL_TYPE'] not in edgeRecord['rel_type']:
-                    relationships[edgeRecord['logical_node2']]['RELATED_REL_TYPE'] += '|' + edgeRecord['rel_type']
-                nextFromDate = baseLibrary.formatDate(edgeRecord['start_date'])
-                if nextFromDate and nextFromDate < relationships[edgeRecord['logical_node2']]['RELATED_FROM_DATE']: 
-                    relationships[edgeRecord['logical_node2']]['RELATED_FROM_DATE'] = nextFromDate
-                nextThruDate = baseLibrary.formatDate(edgeRecord['end_date'])
-                if nextThruDate and nextThruDate < relationships[edgeRecord['logical_node2']]['RELATED_THRU_DATE']:
-                    relationships[edgeRecord['logical_node2']]['RELATED_THRU_DATE'] = nextThruDate
-            
-        #--add to json
-        relTypeCounts = {}
-        subList = []
-        for relatedKey in relationships:
-
-            #--new relationship strategy
-            if relationshipStyle == 2:
-                relatedRecord = {}
-                relatedRecord['REL_POINTER_DOMAIN'] = 'ICIJ_ID'
-                relatedRecord['REL_POINTER_KEY'] = relationships[relatedKey]['RELATED_RECORD_ID']
-                relatedRecord['REL_POINTER_ROLE'] = relationships[relatedKey]['RELATED_REL_TYPE']
-                subList.append(relatedRecord)
-            #--legacy
-            elif relationshipStyle == 1:
-                relatedRecord = {}
-                relatedRecord['RELATIONSHIP_TYPE'] = relationships[relatedKey]['RELATED_REL_TYPE1'] if relationships[relatedKey]['RELATED_REL_TYPE1'] else relationships[relatedKey]['RELATED_REL_TYPE']
-                relatedRecord['RELATIONSHIP_KEY'] = '-'.join(sorted([str(relationships[relatedKey]['RELATED_RECORD_ID']), str(nodeRecord['node_id'])]))
-                subList.append(relatedRecord)
-        if subList:
-            jsonData['RELATIONSHIPS'] = subList
-
-    #--add watch_list keys
-    if addCompositeKeys:
-        jsonData = baseLibrary.jsonUpdater(jsonData)
-
-    #print(json.dumps(jsonData, indent=4, sort_keys=True))
-    #pause()
+    if relPointerList:
+        jsonData['RELATIONSHIPS'] = relPointerList
 
     return jsonData
 
@@ -395,7 +334,6 @@ if __name__ == '__main__':
     argparser.add_argument('-l', '--log_file', default=os.getenv('log_file'.upper(), None), type=str, help='optional statistics filename (json format).')
     argparser.add_argument('-d', '--database', default=os.getenv('database'.upper(), 'ALL'), type=str, help='choose: panama, bahamas, paradise, offshore or all (default=all)')
     argparser.add_argument('-t', '--node_type', default=os.getenv('node_type'.upper(), 'ALL'), type=str, help='choose: entity, intermediary, officer or all (default=all)')
-    argparser.add_argument('-r', '--relationship_style', dest='relationship_style', type=int, default=2, help='styles: 0=None, 1=Legacy linking, 2=Pointers (new for Senzing v1.15)')
     argparser.add_argument('-R', '--reload_csvs', default=False, action='store_true', help='reload from csvs, don\'t use cached data')
     args = argparser.parse_args()
     inputPath = args.input_path
@@ -403,12 +341,10 @@ if __name__ == '__main__':
     logFile = args.log_file
     nodeDatabase = args.database.lower() if args.database else None
     nodeType = args.node_type.lower() if args.node_type else None
-    relationshipStyle = args.relationship_style
     reloadFromCsvs = args.reload_csvs
 
     #--deprecated parameters
     noRelationships = False
-    addCompositeKeys = False
 
     if not (inputPath):
         print('')
@@ -433,34 +369,18 @@ if __name__ == '__main__':
 
     #--register the possible files
     inputFiles = []
-    inputFiles.append({"fileName": "bahamas_leaks.nodes.address.csv", "nodeDatabase": "bahamas", "nodeType": "address"})
-    inputFiles.append({"fileName": "bahamas_leaks.nodes.entity.csv", "nodeDatabase": "bahamas", "nodeType": "entity"})
-    inputFiles.append({"fileName": "bahamas_leaks.nodes.intermediary.csv", "nodeDatabase": "bahamas", "nodeType": "intermediary"})
-    inputFiles.append({"fileName": "bahamas_leaks.nodes.officer.csv", "nodeDatabase": "bahamas", "nodeType": "officer"})
-    inputFiles.append({"fileName": "offshore_leaks.nodes.address.csv", "nodeDatabase": "offshore", "nodeType": "address"})
-    inputFiles.append({"fileName": "offshore_leaks.nodes.entity.csv", "nodeDatabase": "offshore", "nodeType": "entity"})
-    inputFiles.append({"fileName": "offshore_leaks.nodes.intermediary.csv", "nodeDatabase": "offshore", "nodeType": "intermediary"})
-    inputFiles.append({"fileName": "offshore_leaks.nodes.officer.csv", "nodeDatabase": "offshore", "nodeType": "officer"})
-    inputFiles.append({"fileName": "panama_papers.nodes.address.csv", "nodeDatabase": "panama", "nodeType": "address"})
-    inputFiles.append({"fileName": "panama_papers.nodes.entity.csv", "nodeDatabase": "panama", "nodeType": "entity"})
-    inputFiles.append({"fileName": "panama_papers.nodes.intermediary.csv", "nodeDatabase": "panama", "nodeType": "intermediary"})
-    inputFiles.append({"fileName": "panama_papers.nodes.officer.csv", "nodeDatabase": "panama", "nodeType": "officer"})
-    inputFiles.append({"fileName": "paradise_papers.nodes.address.csv", "nodeDatabase": "paradise", "nodeType": "address"})
-    inputFiles.append({"fileName": "paradise_papers.nodes.entity.csv", "nodeDatabase": "paradise", "nodeType": "entity"})
-    inputFiles.append({"fileName": "paradise_papers.nodes.intermediary.csv", "nodeDatabase": "paradise", "nodeType": "intermediary"})
-    inputFiles.append({"fileName": "paradise_papers.nodes.officer.csv", "nodeDatabase": "paradise", "nodeType": "officer"})
-    inputFiles.append({"fileName": "paradise_papers.nodes.other.csv", "nodeDatabase": "paradise", "nodeType": "other"})
-    #--ensure edges files are last as views created on them require prior files
-    inputFiles.append({"fileName": "bahamas_leaks.edges.csv", "nodeDatabase": "bahamas", "nodeType":"edges"})
-    inputFiles.append({"fileName": "offshore_leaks.edges.csv", "nodeDatabase": "offshore", "nodeType": "edges"})
-    inputFiles.append({"fileName": "panama_papers.edges.csv", "nodeDatabase": "panama", "nodeType": "edges"})
-    inputFiles.append({"fileName": "paradise_papers.edges.csv", "nodeDatabase": "paradise", "nodeType": "edges"})
+    inputFiles.append({"fileName": "nodes-entities.csv", "nodeDatabase": "all", "nodeType": "entity"})
+    inputFiles.append({"fileName": "nodes-intermediaries.csv", "nodeDatabase": "all", "nodeType": "intermediary"})
+    inputFiles.append({"fileName": "nodes-officers.csv", "nodeDatabase": "all", "nodeType": "officer"})
+    inputFiles.append({"fileName": "nodes-addresses.csv", "nodeDatabase": "all", "nodeType": "address"})
+    inputFiles.append({"fileName": "nodes-others.csv", "nodeDatabase": "all", "nodeType":"other"})
+    inputFiles.append({"fileName": "relationships.csv", "nodeDatabase": "all", "nodeType": "edges"})
     #--create a table name for each file
     for i in range(len(inputFiles)):
         inputFiles[i]['tableName'] = inputFiles[i]['nodeDatabase'] + '_' + inputFiles[i]['nodeType']
 
     #--open database connection and load from csv if first time
-    dbname = inputPath + (os.path.sep if inputPath[-1:] != os.path.sep else '') + 'icij.db'
+    dbname = inputPath + (os.path.sep if inputPath[-1:] != os.path.sep else '') + 'icij2.db'
     dbExists = os.path.exists(dbname)
     if reloadFromCsvs and dbExists:  #--purge and reload
         print('')
