@@ -15,7 +15,7 @@ Loading ICIJ data into Senzing requires additional features and configurations. 
 [icij_config_updates.g2c](icij_config_updates.g2c) file.
 
 ***Since the ICIJ data set is static, we have already run this mapper and made the mapped json file available 
-[here](https://public-read-access.s3.amazonaws.com/mapped-data-sets/icij-panama-papers/icij_2021.json.zip).
+[here](https://public-read-access.s3.amazonaws.com/mapped-data-sets/icij-offshore-leaks/icij_2020.json.zip).
 You can simply download this file, unzip it and load it right into Senzing!  But don't forget to add the configuration 
 first as documented below!***
 
@@ -42,7 +42,6 @@ optional arguments:
 3. [Configuring Senzing](#configuring-senzing)
 4. [Running the mapper](#running-the-mapper)
 5. [Loading into Senzing](#loading-into-senzing)
-6. [Mapping other data sources](#mapping-other-data-sources)
 
 ### Prerequisites
 
@@ -101,7 +100,7 @@ listed below:
 - nodes-others.csv
 - relationships.csv
 
-Unzip the files to a directory of your choice. *(in the example below the csv files where unzipped to /senzing/mappers/mapper-icij/input)*
+Unzip the files to a directory of your choice. *(in the example below the csv files were unzipped to /senzing/mappers/mapper-icij/input)*
 
 The mapper will read all the files and create one output file.  Example usage:
 
