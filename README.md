@@ -2,19 +2,20 @@
 
 ## Overview
 
-The [icij_mapper.py](icij_mapper.py) python script converts the ICIJ: International Consortium of Investigative Journalists
-csv files to json files ready to load into Senzing.  This includes the ...
+The [icij_mapper.py](icij_mapper.py) python script converts the ICIJ Offshore Leaks database to json files ready to load into Senzing. 
 
+This includes the ...
 - Panama Papers
 - Paradise Papers
 - Bahamas Leaks
 - Offshore Leaks
+- Pandora Papers (added in 2020)
 
 Loading ICIJ data into Senzing requires additional features and configurations. These are contained in the
 [icij_config_updates.g2c](icij_config_updates.g2c) file.
 
 ***Since the ICIJ data set is static, we have already run this mapper and made the mapped json file available 
-[here](https://public-read-access.s3.amazonaws.com/mapped-data-sets/icij-panama-papers/icij_2018.json.zip).
+[here](https://public-read-access.s3.amazonaws.com/mapped-data-sets/icij-panama-papers/icij_2021.json.zip).
 You can simply download this file, unzip it and load it right into Senzing!  But don't forget to add the configuration 
 first as documented below!***
 
@@ -22,40 +23,31 @@ Usage:
 
 ```console
 python icij_mapper.py --help
-usage: icij_mapper.py [-h] [-i INPUT_PATH] [-o OUTPUT_FILE]
-                      [-l LOG_FILE] [-d DATABASE]
-                      [-t NODE_TYPE] [-R]
+usage: icij_mapper.py [-h] [-i INPUT_PATH] [-o OUTPUT_FILE] [-l LOG_FILE]
 
 optional arguments:
   -h, --help            show this help message and exit
   -i INPUT_PATH, --input_path INPUT_PATH
-                        path to the downloaded icij csv files.
+                        path to the downloaded ICIJ csv files
   -o OUTPUT_FILE, --output_file OUTPUT_FILE
-                        path and file name for the json output.
+                        path and file name for the json output
   -l LOG_FILE, --log_file LOG_FILE
-                        optional statistics filename (json format).
-  -d DATABASE, --database DATABASE
-                        choose: panama, bahamas, paradise, offshore or all,
-                        default=all
-  -t NODE_TYPE, --node_type NODE_TYPE
-                        choose: entity, intermediary, officer or all,
-                        default=all
-  -R, --reload_csvs     reload from csvs, don't use cached data.
+                        optional statistics filename (json format)
 ```
 
 ## Contents
 
 1. [Prerequisites](#prerequisites)
-1. [Installation](#installation)
-1. [Running the mapper](#running-the-mapper)
-1. [Configuring Senzing](#configuring-senzing)
-1. [Loading into Senzing](#loading-into-senzing)
-1. [Mapping other data sources](#mapping-other-data-sources)
+2. [Installation](#installation)
+3. [Configuring Senzing](#configuring-senzing)
+4. [Running the mapper](#running-the-mapper)
+5. [Loading into Senzing](#loading-into-senzing)
+6. [Mapping other data sources](#mapping-other-data-sources)
 
 ### Prerequisites
 
 - python 3.6 or higher
-- Senzing API version 1.13 or higher
+- Senzing API version 2.1 or higher
 - pandas (pip3 install pandas)
 - [Senzing/mapper-base](https://github.com/Senzing/mapper-base)
 
@@ -79,62 +71,11 @@ You will also need to set the PYTHONPATH to where the base mapper is as follows 
 export PYTHONPATH=$PYTHONPATH:/senzing/mappers/mapper-base
 ```
 
-### Running the mapper
-
-Download the raw files from ... [https://offshoreleaks.icij.org/pages/database](https://offshoreleaks.icij.org/pages/database)
-
-There are 4 zip files containing the files listed below. Its best just to unzip them all on the same directory
-
-#### csv_panama_papers.zip
-
-- panama_papers.nodes.address.csv
-- panama_papers.nodes.entity.csv
-- panama_papers.nodes.intermediary.csv
-- panama_papers.nodes.officer.csv
-- panama_papers.edges.csv
-
-#### csv_paradise_papers.zip
-
-- paradise_papers.nodes.address.csv
-- paradise_papers.nodes.entity.csv
-- paradise_papers.nodes.intermediary.csv
-- paradise_papers.nodes.officer.csv
-- paradise_papers.nodes.other.csv
-- paradise_papers.edges.csv
-
-#### csv_bahamas_leaks.zip
-
-- bahamas_leaks.nodes.address.csv
-- bahamas_leaks.nodes.entity.csv
-- bahamas_leaks.nodes.intermediary.csv
-- bahamas_leaks.nodes.officer.csv
-- bahamas_leaks.edges.csv
-
-#### csv_offshore_leaks.zip
-
-- offshore_leaks.nodes.address.csv
-- offshore_leaks.nodes.entity.csv
-- offshore_leaks.nodes.intermediary.csv
-- offshore_leaks.nodes.officer.csv
-- offshore_leaks.edges.csv
-
-The mapper will read all the files and create one output file.  Example usage:
-
-```console
-python3 icij_mapper.py -i ./input -o ./output/icij_2018.json -l icij_stats.json
-```
-
-- Add the -d parameter if you just want to map one of the 4 databases from ICIJ (panama, paradise, bahamas or offshore).
-- Add the -t parameter if you just want to map one of the 3 node_types from ICIJ (entity, intermediary, or officer).
-- Use the -nr parameter to not create relationships.  This watch list has many disclosed relationships.  It is good to have them, but it loads faster if you turn them off.
-- Use the -ck parameter if you are using a Senzing version prior to 1.13 and the composite keys will be generated by this mapper.   After version 1.13, the keys are generated automatically.
-- Use the -R parameter if you have downloaded fresh csv files from the ICIJ website.
-
 ### Configuring Senzing
 
-*Note:* This only needs to be performed once and may want to add these configuration updates to a master configuration file for all your data sources.
+*Note:* This only needs to be performed one time! In fact you may want to add these configuration updates to a master configuration file for all your data sources.
 
-From your Senzing project's python directory, type:
+From the /opt/senzing/g2/python directory ...
 
 ```console
 python3 G2ConfigTool.py <path-to-file>/icij_config_updates.g2c
@@ -144,19 +85,33 @@ This will step you through the process of adding the data sources, entity types,
 
 *Please note the use of ENTITY_TYPE is being deprecated in favor of RECORD_TYPE.  This mapper maps both for backwards compatibility.*
 
+### Running the mapper
+
+Download the raw files from: [https://offshoreleaks.icij.org/pages/database](https://offshoreleaks.icij.org/pages/database)
+
+With the addition of the Pandora Papers in November 2020, there is now only 1 zip file *currently* named **full-oldb-20211202.zip** containing the files 
+listed below:
+
+- nodes-entities.csv
+- nodes-intermediaries.csv
+- nodes-officers.csv
+- nodes-addresses.csv
+- nodes-others.csv
+- relationships.csv
+
+The mapper will read all the files and create one output file.  Example usage:
+
+```console
+python3 icij_mapper.py -i /icij_mapper/input -o /icij_mapper/output/icij_2020.json -l icij_stats.json
+```
+*where /icij_mapper/input/ is where the unziped csv files are located*
+
 ### Loading into Senzing
 
-The JSON file created by this mapper can be loaded into Senzing in various ways.  If you have a docker or AWS setup, you can load them via the stream-producer or if you
-have a bare metal install you can load them via the G2Loader python script provided in the install.
+If you use the G2Loader program to load your data, from the /opt/senzing/g2/python directory ...
 
-This data set currently contains about 1.9 million records and make take a few hours to load depending on your harware.
+```console
+python3 G2Loader.py -f /icij_mapper/output/icij_2020.json
+```
 
-### Mapping other data sources
-
-Watch lists are harder to match simply because often the only data they contain that matches your other data sources are name, partial date of birth, and citizenship or nationality.  Complete address or identifier matches are possible but more rare. Likewise, employer names and other group affiliations can also help match watch lists.  Look for and map these features in your source data ...
-
-- CITIZENSHIP
-- NATIONALITY
-- ADDRESS_COUNTRY in addresses
-- PASSPORT_COUNTRY and other identifier countries
-- GROUP_ASSOCIATION_ORG_NAME (employers and other group affiliations)
+This data set currently contains about 1.9 million records and make take an hour or more to load depending on your hardware.

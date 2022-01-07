@@ -64,91 +64,90 @@ def updateStat(cat1, cat2, example = None):
 def csv2db():
     ''' load database '''
     for fileDict in inputFiles:
-        if fileDict['nodeDatabase'].upper() == nodeDatabase.upper() or nodeDatabase.upper() == 'ALL':
-            dbObj = conn.cursor()
-            dbCursor = dbObj.execute("select name from sqlite_master where type='table' AND name='%s'" % fileDict['tableName'])
-            dbRow = dbCursor.fetchone()
-            if not dbRow:
-                fileDict['fileName'] = inputPath + (os.path.sep if inputPath[-1:] != os.path.sep else '') + fileDict['fileName']
-                print('loading %s ...' % fileDict['fileName'])
-                df = pandas.read_csv(fileDict['fileName'], low_memory=False, encoding="latin-1", quotechar='"')
-                df.to_sql(fileDict['tableName'], conn, if_exists="replace")
-                if fileDict['nodeType'] != 'edges':
-                    conn.cursor().execute('create index ix_%s on %s (_id)' % (fileDict['tableName'], fileDict['tableName']))
-                else:
- 
-                    # note: in dec 2020, ICIJ released the Pandora Papers and went to a single database - 1 set of csv files for all
-                    #  the _start and _end fields in the edges table used to refer to the node_id in the node tables
-                    #  now they refer to the _id field in the node tables
+        dbObj = conn.cursor()
+        dbCursor = dbObj.execute("select name from sqlite_master where type='table' AND name='%s'" % fileDict['tableName'])
+        dbRow = dbCursor.fetchone()
+        if not dbRow:
+            fileDict['fileName'] = inputPath + (os.path.sep if inputPath[-1:] != os.path.sep else '') + fileDict['fileName']
+            print('loading %s ...' % fileDict['fileName'])
+            df = pandas.read_csv(fileDict['fileName'], low_memory=False, encoding="utf-8", quotechar='"')
+            df.to_sql(fileDict['tableName'], conn, if_exists="replace")
+            if fileDict['nodeType'] != 'edges':
+                conn.cursor().execute('create index ix_%s on %s (_id)' % (fileDict['tableName'], fileDict['tableName']))
+            else:
 
-                    conn.cursor().execute('create index ix_%s1 on %s (_start)' % (fileDict['tableName'], fileDict['tableName']))
-                    
-                    sql = "create view %s_view as " % (fileDict['nodeDatabase'] + '_edges',)
-                    sql += "select  "
-                    sql += " a._start, "
-                    sql += " case when b.node_id is null then "
-                    sql += "  case when c.node_id is null then "
-                    sql += "   case when d.node_id is null then "
-                    sql += "    case when e.node_id is null then null " 
-                    sql += "     else e.node_id end "
-                    sql += "    else d.node_id end "
-                    sql += "   else c.node_id end "
-                    sql += "  else b.node_id end as node1_id, "
-                    sql += " case when b.node_id is null then "
-                    sql += "  case when c.node_id is null then "
-                    sql += "   case when d.node_id is null then "
-                    sql += "    case when e.node_id is null then null " 
-                    sql += "     else 'address' end "
-                    sql += "    else 'officer' end "
-                    sql += "   else 'intermediary' end "
-                    sql += "  else 'entity' end as node1_type, "
-                    sql += " case when b.node_id is null then "
-                    sql += "  case when c.node_id is null then "
-                    sql += "   case when d.node_id is null then "
-                    sql += "    case when e.node_id is null then null " 
-                    sql += "     else case when e.name is null then e.address else e.name end end "
-                    sql += "    else d.name end "
-                    sql += "   else c.name end "
-                    sql += "  else b.name end as node1_desc, "
-                    sql += " a._type, " 
-                    sql += " a.link, " 
-                    sql += " a._end, "
-                    sql += " case when f.node_id is null then "
-                    sql += "  case when g.node_id is null then "
-                    sql += "   case when h.node_id is null then "
-                    sql += "    case when i.node_id is null then null " 
-                    sql += "     else i.node_id end "
-                    sql += "    else h.node_id end "
-                    sql += "   else g.node_id end "
-                    sql += "  else f.node_id end as node2_id, "
-                    sql += " case when f.node_id is null then "
-                    sql += "  case when g.node_id is null then "
-                    sql += "   case when h.node_id is null then "
-                    sql += "    case when i.node_id is null then null " 
-                    sql += "     else 'address' end "
-                    sql += "    else 'officer' end "
-                    sql += "   else 'intermediary' end "
-                    sql += "  else 'entity' end as node2_type, "
-                    sql += " case when f.node_id is null then "
-                    sql += "  case when g.node_id is null then "
-                    sql += "   case when h.node_id is null then "
-                    sql += "    case when i.node_id is null then null "
-                    sql += "     else case when i.name is null then i.address else i.name end end "
-                    sql += "    else h.name end "
-                    sql += "   else g.name end "
-                    sql += "  else f.name end as node2_desc, "
-                    sql += " a.start_date, "
-                    sql += " a.end_date "
-                    sql += "from %s a "  % (fileDict['nodeDatabase'] + '_edges',)
-                    sql += "left join %s b on b._id = a._start "  % (fileDict['nodeDatabase'] + '_entity', )
-                    sql += "left join %s c on c._id = a._start "  % (fileDict['nodeDatabase'] + '_intermediary', )
-                    sql += "left join %s d on d._id = a._start "  % (fileDict['nodeDatabase'] + '_officer', )
-                    sql += "left join %s e on e._id = a._start "  % (fileDict['nodeDatabase'] + '_address', ) 
-                    sql += "left join %s f on f._id = a._end "  % (fileDict['nodeDatabase'] + '_entity', )
-                    sql += "left join %s g on g._id = a._end "  % (fileDict['nodeDatabase'] + '_intermediary', )
-                    sql += "left join %s h on h._id = a._end "  % (fileDict['nodeDatabase'] + '_officer', )
-                    sql += "left join %s i on i._id = a._end "  % (fileDict['nodeDatabase'] + '_address', )
-                    conn.cursor().execute(sql)
+                # note: in dec 2020, ICIJ released the Pandora Papers and went to a single database - 1 set of csv files for all
+                #  the _start and _end fields in the edges table used to refer to the node_id in the node tables
+                #  now they refer to the _id field in the node tables
+
+                conn.cursor().execute('create index ix_%s1 on %s (_start)' % (fileDict['tableName'], fileDict['tableName']))
+                
+                sql = "create view %s_view as " % (fileDict['nodeDatabase'] + '_edges',)
+                sql += "select  "
+                sql += " a._start, "
+                sql += " case when b.node_id is null then "
+                sql += "  case when c.node_id is null then "
+                sql += "   case when d.node_id is null then "
+                sql += "    case when e.node_id is null then null " 
+                sql += "     else e.node_id end "
+                sql += "    else d.node_id end "
+                sql += "   else c.node_id end "
+                sql += "  else b.node_id end as node1_id, "
+                sql += " case when b.node_id is null then "
+                sql += "  case when c.node_id is null then "
+                sql += "   case when d.node_id is null then "
+                sql += "    case when e.node_id is null then null " 
+                sql += "     else 'address' end "
+                sql += "    else 'officer' end "
+                sql += "   else 'intermediary' end "
+                sql += "  else 'entity' end as node1_type, "
+                sql += " case when b.node_id is null then "
+                sql += "  case when c.node_id is null then "
+                sql += "   case when d.node_id is null then "
+                sql += "    case when e.node_id is null then null " 
+                sql += "     else case when e.name is null then e.address else e.name end end "
+                sql += "    else d.name end "
+                sql += "   else c.name end "
+                sql += "  else b.name end as node1_desc, "
+                sql += " a._type, " 
+                sql += " a.link, " 
+                sql += " a._end, "
+                sql += " case when f.node_id is null then "
+                sql += "  case when g.node_id is null then "
+                sql += "   case when h.node_id is null then "
+                sql += "    case when i.node_id is null then null " 
+                sql += "     else i.node_id end "
+                sql += "    else h.node_id end "
+                sql += "   else g.node_id end "
+                sql += "  else f.node_id end as node2_id, "
+                sql += " case when f.node_id is null then "
+                sql += "  case when g.node_id is null then "
+                sql += "   case when h.node_id is null then "
+                sql += "    case when i.node_id is null then null " 
+                sql += "     else 'address' end "
+                sql += "    else 'officer' end "
+                sql += "   else 'intermediary' end "
+                sql += "  else 'entity' end as node2_type, "
+                sql += " case when f.node_id is null then "
+                sql += "  case when g.node_id is null then "
+                sql += "   case when h.node_id is null then "
+                sql += "    case when i.node_id is null then null "
+                sql += "     else case when i.name is null then i.address else i.name end end "
+                sql += "    else h.name end "
+                sql += "   else g.name end "
+                sql += "  else f.name end as node2_desc, "
+                sql += " a.start_date, "
+                sql += " a.end_date "
+                sql += "from %s a "  % (fileDict['nodeDatabase'] + '_edges',)
+                sql += "left join %s b on b._id = a._start "  % (fileDict['nodeDatabase'] + '_entity', )
+                sql += "left join %s c on c._id = a._start "  % (fileDict['nodeDatabase'] + '_intermediary', )
+                sql += "left join %s d on d._id = a._start "  % (fileDict['nodeDatabase'] + '_officer', )
+                sql += "left join %s e on e._id = a._start "  % (fileDict['nodeDatabase'] + '_address', ) 
+                sql += "left join %s f on f._id = a._end "  % (fileDict['nodeDatabase'] + '_entity', )
+                sql += "left join %s g on g._id = a._end "  % (fileDict['nodeDatabase'] + '_intermediary', )
+                sql += "left join %s h on h._id = a._end "  % (fileDict['nodeDatabase'] + '_officer', )
+                sql += "left join %s i on i._id = a._end "  % (fileDict['nodeDatabase'] + '_address', )
+                conn.cursor().execute(sql)
 
     return
 
@@ -176,10 +175,10 @@ def processTable(fileDict):
         rowCount += 1
         nodeRecord = dict(zip(dbHeader, dbRow))
         jsonData = node2Json(tableName, nodeRecord, nodeDatabase, nodeType)
-        msg = json.dumps(jsonData, ensure_ascii=False)
-        #if len(msg) > 10000:
+        msg = json.dumps(jsonData)
+        #if len(msg) > 100000:
         #    print(msg)
-            #pause()
+        #   pause()
 
         try: outputFileHandle.write(msg + '\n')
         except IOError as err:
@@ -329,22 +328,13 @@ if __name__ == '__main__':
     progressInterval = 10000
 
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('-i', '--input_path', default=os.getenv('input_path'.upper(), None), type=str, help='path to the downloaded ICIJ csv files.')
-    argparser.add_argument('-o', '--output_file', default=os.getenv('output_file'.upper(), None), type=str, help='path and file name for the json output.')
-    argparser.add_argument('-l', '--log_file', default=os.getenv('log_file'.upper(), None), type=str, help='optional statistics filename (json format).')
-    argparser.add_argument('-d', '--database', default=os.getenv('database'.upper(), 'ALL'), type=str, help='choose: panama, bahamas, paradise, offshore or all (default=all)')
-    argparser.add_argument('-t', '--node_type', default=os.getenv('node_type'.upper(), 'ALL'), type=str, help='choose: entity, intermediary, officer or all (default=all)')
-    argparser.add_argument('-R', '--reload_csvs', default=False, action='store_true', help='reload from csvs, don\'t use cached data')
+    argparser.add_argument('-i', '--input_path', default=os.getenv('input_path'.upper(), None), type=str, help='path to the downloaded ICIJ csv files')
+    argparser.add_argument('-o', '--output_file', default=os.getenv('output_file'.upper(), None), type=str, help='path and file name for the json output')
+    argparser.add_argument('-l', '--log_file', default=os.getenv('log_file'.upper(), None), type=str, help='optional statistics filename (json format)')
     args = argparser.parse_args()
     inputPath = args.input_path
     outputFileName = args.output_file
     logFile = args.log_file
-    nodeDatabase = args.database.lower() if args.database else None
-    nodeType = args.node_type.lower() if args.node_type else None
-    reloadFromCsvs = args.reload_csvs
-
-    #--deprecated parameters
-    noRelationships = False
 
     if not (inputPath):
         print('')
@@ -367,14 +357,14 @@ if __name__ == '__main__':
         print('')
         sys.exit(1)
 
-    #--register the possible files
+    #--register the expected files
     inputFiles = []
-    inputFiles.append({"fileName": "nodes-entities.csv", "nodeDatabase": "all", "nodeType": "entity"})
-    inputFiles.append({"fileName": "nodes-intermediaries.csv", "nodeDatabase": "all", "nodeType": "intermediary"})
-    inputFiles.append({"fileName": "nodes-officers.csv", "nodeDatabase": "all", "nodeType": "officer"})
-    inputFiles.append({"fileName": "nodes-addresses.csv", "nodeDatabase": "all", "nodeType": "address"})
-    inputFiles.append({"fileName": "nodes-others.csv", "nodeDatabase": "all", "nodeType":"other"})
-    inputFiles.append({"fileName": "relationships.csv", "nodeDatabase": "all", "nodeType": "edges"})
+    inputFiles.append({"fileName": "nodes-entities.csv", "nodeDatabase": "icij", "nodeType": "entity"})
+    inputFiles.append({"fileName": "nodes-intermediaries.csv", "nodeDatabase": "icij", "nodeType": "intermediary"})
+    inputFiles.append({"fileName": "nodes-officers.csv", "nodeDatabase": "icij", "nodeType": "officer"})
+    inputFiles.append({"fileName": "nodes-addresses.csv", "nodeDatabase": "icij", "nodeType": "address"})
+    inputFiles.append({"fileName": "nodes-others.csv", "nodeDatabase": "icij", "nodeType":"other"})
+    inputFiles.append({"fileName": "relationships.csv", "nodeDatabase": "icij", "nodeType": "edges"})
     #--create a table name for each file
     for i in range(len(inputFiles)):
         inputFiles[i]['tableName'] = inputFiles[i]['nodeDatabase'] + '_' + inputFiles[i]['nodeType']
@@ -382,9 +372,7 @@ if __name__ == '__main__':
     #--open database connection and load from csv if first time
     dbname = inputPath + (os.path.sep if inputPath[-1:] != os.path.sep else '') + 'icij2.db'
     dbExists = os.path.exists(dbname)
-    if reloadFromCsvs and dbExists:  #--purge and reload
-        print('')
-        print('Cashed csv data purged!')
+    if dbExists:
         os.remove(dbname)
     conn = sqlite3.connect(dbname)
     csv2db()
@@ -394,10 +382,9 @@ if __name__ == '__main__':
 
     #--process each table
     for fileDict in inputFiles:
-        if (fileDict['nodeDatabase'] == nodeDatabase.lower() or nodeDatabase.upper() == 'ALL') and (fileDict['nodeType'] == nodeType.lower() or nodeType.upper() == 'ALL'):
-            processTable(fileDict)
-            if shutDown:
-                break
+        processTable(fileDict)
+        if shutDown:
+            break
 
     outputFileHandle.close()
 
