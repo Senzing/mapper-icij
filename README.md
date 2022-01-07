@@ -89,6 +89,8 @@ This will step you through the process of adding the data sources, entity types,
 
 Download the raw files from: [https://offshoreleaks.icij.org/pages/database](https://offshoreleaks.icij.org/pages/database)
 
+![download-page](images/download-page.jpg)
+
 With the addition of the Pandora Papers in November 2020, there is now only 1 zip file *currently* named **full-oldb-20211202.zip** containing the files 
 listed below:
 
