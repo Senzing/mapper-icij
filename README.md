@@ -99,19 +99,20 @@ listed below:
 - nodes-others.csv
 - relationships.csv
 
+Unzip the files to a directory of your choice. *(in the example below the csv files where unzipped to /senzing/mappers/mapper-icij/input)*
+
 The mapper will read all the files and create one output file.  Example usage:
 
 ```console
-python3 icij_mapper.py -i /icij_mapper/input -o /icij_mapper/output/icij_2020.json -l icij_stats.json
+python3 icij_mapper.py -i /senzing/mappers/mapper-icij/input -o /senzing/mappers/mapper-icij/output/icij_2020.json
 ```
-*where /icij_mapper/input/ is where the unziped csv files are located*
 
 ### Loading into Senzing
 
 If you use the G2Loader program to load your data, from the /opt/senzing/g2/python directory ...
 
 ```console
-python3 G2Loader.py -f /icij_mapper/output/icij_2020.json
+python3 G2Loader.py -f /senzing/mappers/mapper-icij/output/icij_2020.json
 ```
 
 This data set currently contains about 1.9 million records and make take an hour or more to load depending on your hardware.
