@@ -11,13 +11,14 @@ This includes the ...
 - Offshore Leaks
 - Pandora Papers (added in 2020)
 
+***Since the ICIJ data set is static, we have already run this mapper and made the mapped json file available.  You can
+download it by clicking here:
+[icij_2020.json.zip](https://public-read-access.s3.amazonaws.com/mapped-data-sets/icij-offshore-leaks/icij_2020.json.zip).
+You can then unzip it and load it right into Senzing!  But don't forget to add the configuration first as documented below!***
+
 Loading ICIJ data into Senzing requires additional features and configurations. These are contained in the
 [icij_config_updates.g2c](icij_config_updates.g2c) file.
 
-***Since the ICIJ data set is static, we have already run this mapper and made the mapped json file available.  You can
-download it by clicking here:
-[icij_2020.json.zip](https://public-read-access.s3.amazonaws.com/mapped-data-sets/icij-offshore-leaks/icij_2020.json.zip)
-, unzip it and load it right into Senzing!  But don't forget to add the configuration first as documented below!***
 
 Usage:
 
