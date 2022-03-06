@@ -278,6 +278,14 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
     while edgeRow:
         edgeRecord = dict(zip(edgeHeader, edgeRow))
 
+        if edgeRecord['link']: #--fix long usage types
+            if len(edgeRecord['link']) > 50:
+                updateStat('TRUNCATED_LINKS', edgeRecord['link'])
+                if ';' in edgeRecord['link']:
+                    edgeRecord['link'] = 'MULTIPLE USE'
+                else:
+                    edgeRecord['link'] = edgeRecord['link'][0:50]
+
         #--map the relationship
         relPointerRecord = {}
         relPointerRecord['REL_POINTER_DOMAIN'] = 'ICIJ_ID'
