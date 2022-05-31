@@ -94,8 +94,8 @@ Download the raw files from: [https://offshoreleaks.icij.org/pages/database](htt
 
 ![download page](images/download_page.jpg)
 
-With the addition of the Pandora Papers in November 2020, there is now only 1 zip file *currently* named **full-oldb-20211202.zip** containing the files 
-listed below:
+With the addition of the Pandora Papers in November 2020 and again in May 2022, there is now only 1 zip file
+ *currently* named **full-oldb-20220503.zip** containing the files listed below:
 
 - nodes-entities.csv
 - nodes-intermediaries.csv
@@ -109,7 +109,7 @@ Unzip the files to a directory of your choice. *(in the example below the csv fi
 The mapper will read all the files and create one output file.  Example usage:
 
 ```console
-python3 icij_mapper.py -i /senzing/mappers/mapper-icij/input -o /senzing/mappers/mapper-icij/output/icij_2020.json
+python3 icij_mapper.py -i /senzing/mappers/mapper-icij/input -o /senzing/mappers/mapper-icij/output/icij_2022.json
 ```
 
 ### Loading into Senzing
@@ -117,7 +117,7 @@ python3 icij_mapper.py -i /senzing/mappers/mapper-icij/input -o /senzing/mappers
 If you use the G2Loader program to load your data, from the /opt/senzing/g2/python directory ...
 
 ```console
-python3 G2Loader.py -f /senzing/mappers/mapper-icij/output/icij_2020.json
+python3 G2Loader.py -f /senzing/mappers/mapper-icij/output/icij_2022.json
 ```
 
 This data set currently contains about 1.9 million records and make take an hour or more to load depending on your hardware.
