@@ -68,23 +68,30 @@ def csv2db():
         dbCursor = dbObj.execute("select name from sqlite_master where type='table' AND name='%s'" % fileDict['tableName'])
         dbRow = dbCursor.fetchone()
         if not dbRow:
+
+            # note: in dec 2020, ICIJ released the Pandora Papers and went to a single database - 1 set of csv files for all
+            #  the _start and _end fields in the edges table used to refer to the node_id in the node tables
+            #  now they refer to the _id field in the node tables
+
+            # note: in may 2022, ICIJ released new data and changed format again
+            # Now all edges contain the sourceID value related to the project they belong to.
+            # We removed the _id columns, and kept only node_id columns to link between nodes and relationships.
+            # Example to merge Officers and Entities nodes:
+            # nodes-officers.csv node_id column <-> relationships.csv node_id_start column <-> relationships.csv node_id_end column <-> nodes-entities.csv node_id column
+
             fileDict['fileName'] = inputPath + (os.path.sep if inputPath[-1:] != os.path.sep else '') + fileDict['fileName']
             print('loading %s ...' % fileDict['fileName'])
             df = pandas.read_csv(fileDict['fileName'], low_memory=False, encoding="utf-8", quotechar='"')
             df.to_sql(fileDict['tableName'], conn, if_exists="replace")
             if fileDict['nodeType'] != 'edges':
-                conn.cursor().execute('create index ix_%s on %s (_id)' % (fileDict['tableName'], fileDict['tableName']))
+                conn.cursor().execute('create index ix_%s on %s (node_id)' % (fileDict['tableName'], fileDict['tableName']))
             else:
 
-                # note: in dec 2020, ICIJ released the Pandora Papers and went to a single database - 1 set of csv files for all
-                #  the _start and _end fields in the edges table used to refer to the node_id in the node tables
-                #  now they refer to the _id field in the node tables
-
-                conn.cursor().execute('create index ix_%s1 on %s (_start)' % (fileDict['tableName'], fileDict['tableName']))
+                conn.cursor().execute('create index ix_%s1 on %s (node_id_start)' % (fileDict['tableName'], fileDict['tableName']))
                 
                 sql = "create view %s_view as " % (fileDict['nodeDatabase'] + '_edges',)
                 sql += "select  "
-                sql += " a._start, "
+                sql += " a.node_id_start, "
                 sql += " case when b.node_id is null then "
                 sql += "  case when c.node_id is null then "
                 sql += "   case when d.node_id is null then "
@@ -109,9 +116,9 @@ def csv2db():
                 sql += "    else d.name end "
                 sql += "   else c.name end "
                 sql += "  else b.name end as node1_desc, "
-                sql += " a._type, " 
+                sql += " a.rel_type, "
                 sql += " a.link, " 
-                sql += " a._end, "
+                sql += " a.node_id_end, "
                 sql += " case when f.node_id is null then "
                 sql += "  case when g.node_id is null then "
                 sql += "   case when h.node_id is null then "
@@ -139,14 +146,14 @@ def csv2db():
                 sql += " a.start_date, "
                 sql += " a.end_date "
                 sql += "from %s a "  % (fileDict['nodeDatabase'] + '_edges',)
-                sql += "left join %s b on b._id = a._start "  % (fileDict['nodeDatabase'] + '_entity', )
-                sql += "left join %s c on c._id = a._start "  % (fileDict['nodeDatabase'] + '_intermediary', )
-                sql += "left join %s d on d._id = a._start "  % (fileDict['nodeDatabase'] + '_officer', )
-                sql += "left join %s e on e._id = a._start "  % (fileDict['nodeDatabase'] + '_address', ) 
-                sql += "left join %s f on f._id = a._end "  % (fileDict['nodeDatabase'] + '_entity', )
-                sql += "left join %s g on g._id = a._end "  % (fileDict['nodeDatabase'] + '_intermediary', )
-                sql += "left join %s h on h._id = a._end "  % (fileDict['nodeDatabase'] + '_officer', )
-                sql += "left join %s i on i._id = a._end "  % (fileDict['nodeDatabase'] + '_address', )
+                sql += "left join %s b on b.node_id = a.node_id_start "  % (fileDict['nodeDatabase'] + '_entity', )
+                sql += "left join %s c on c.node_id = a.node_id_start "  % (fileDict['nodeDatabase'] + '_intermediary', )
+                sql += "left join %s d on d.node_id = a.node_id_start "  % (fileDict['nodeDatabase'] + '_officer', )
+                sql += "left join %s e on e.node_id = a.node_id_start "  % (fileDict['nodeDatabase'] + '_address', )
+                sql += "left join %s f on f.node_id = a.node_id_end "  % (fileDict['nodeDatabase'] + '_entity', )
+                sql += "left join %s g on g.node_id = a.node_id_end "  % (fileDict['nodeDatabase'] + '_intermediary', )
+                sql += "left join %s h on h.node_id = a.node_id_end "  % (fileDict['nodeDatabase'] + '_officer', )
+                sql += "left join %s i on i.node_id = a.node_id_end "  % (fileDict['nodeDatabase'] + '_address', )
                 conn.cursor().execute(sql)
 
     return
@@ -203,10 +210,20 @@ def processTable(fileDict):
 def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
     ''' map node to json structure '''
     
+
+    # support for duplicate nodes
+    # they are the same real entity, just of a different type as in entity vs intermediary
+    node_id = str(nodeRecord['node_id'])
+    if node_id in node_cache:
+        node_cache[node_id] += 1
+        node_id = f"{node_id}-{node_cache[node_id]}"
+    else:
+        node_cache[node_id] = 0
+
     #--set the data source
     jsonData = {}
     jsonData['DATA_SOURCE'] = 'ICIJ'
-    jsonData['RECORD_ID'] = str(nodeRecord['node_id'])
+    jsonData['RECORD_ID'] = node_id
 
     entityName = nodeRecord.get('name', '')
 
@@ -219,6 +236,7 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
         jsonData['PRIMARY_NAME_FULL'] = entityName
     elif nodeType.upper() == 'ADDRESS': 
         jsonData['ENTITY_TYPE'] = 'ADDRESS'
+        jsonData['PRIMARY_NAME_FULL'] = nodeRecord.get('address', '')
     else:
         jsonData['ENTITY_TYPE'] = 'ORGANIZATION'
         jsonData['PRIMARY_NAME_ORG'] = entityName
@@ -271,8 +289,8 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
         addressList.append({"ADDR_TYPE": "PRIMARY", "ADDR_FULL": nodeRecord['address']})
 
     edgeObj = conn.cursor()
-    edgeSql = 'select * from %s_edges_view where _start = %s ' % (nodeDatabase, nodeRecord['_id'])
-    edgeCursor = edgeObj.execute(edgeSql)        
+    edgeSql = f"select * from {nodeDatabase}_edges_view where node_id_start = {nodeRecord['node_id']}"
+    edgeCursor = edgeObj.execute(edgeSql)
     edgeHeader = [col[0] for col in edgeObj.description]
     edgeRow = edgeCursor.fetchone()
     while edgeRow:
@@ -387,6 +405,7 @@ if __name__ == '__main__':
 
     #--initialize the statpack
     statPack = {}
+    node_cache = {} # to suppot dupicate node IDs
 
     #--process each table
     for fileDict in inputFiles:

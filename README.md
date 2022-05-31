@@ -11,9 +11,12 @@ This includes the ...
 - Offshore Leaks
 - Pandora Papers (added in 2020)
 
+*In May 2022, ICIJ added additional records to their database and updated their format again.   This mapper will only work
+with files dated 05/03/2022 which can be downloaded [here](https://offshoreleaks-data.icij.org/offshoreleaks/csv/full-oldb.20220503.zip)*
+
 ***Since the ICIJ data set is static, we have already run this mapper and made the mapped json file available.  You can
 download it by clicking here:
-[icij_2020.json.zip](https://public-read-access.s3.amazonaws.com/mapped-data-sets/icij-offshore-leaks/icij_2020.json.zip).
+[icij_2022.json.zip](https://public-read-access.s3.amazonaws.com/mapped-data-sets/icij-offshore-leaks/icij_2022.json.zip).
 You can then unzip it and load it right into Senzing!  But don't forget to add the configuration first as documented below!***
 
 Loading ICIJ data into Senzing requires additional features and configurations. These are contained in the
