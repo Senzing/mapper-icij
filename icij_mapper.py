@@ -227,6 +227,7 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
     jsonData['RECORD_ID'] = node_id
 
     entityName = nodeRecord.get('name', '')
+    entityAddress = nodeRecord.get('address', '')
 
     #--the nodes files have a field for this, the address file doesn't
     node_source = nodeRecord.get('sourceID', nodeDatabase)
@@ -237,7 +238,10 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
         jsonData['PRIMARY_NAME_FULL'] = entityName
     elif nodeType.upper() == 'ADDRESS': 
         jsonData['RECORD_TYPE'] = 'ADDRESS'
-        jsonData['PRIMARY_NAME_FULL'] = 'ADDRESS: ' + nodeRecord.get('address', '')
+        # address nodes sometimes have the address in the name field
+        if entityName and not entityAddress:
+            entityAddress = entityName
+
     else:
         jsonData['RECORD_TYPE'] = 'ORGANIZATION'
         jsonData['PRIMARY_NAME_ORG'] = entityName
@@ -285,8 +289,8 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
     relPointerList = []
     groupAssociationList = []
     addressList = []
-    if 'address' in nodeRecord and nodeRecord['address']: 
-        addressList.append({"ADDR_TYPE": "PRIMARY", "ADDR_FULL": nodeRecord['address']})
+    if entityAddress:
+        addressList.append({"ADDR_TYPE": "PRIMARY", "ADDR_FULL": entityAddress})
 
     edgeObj = conn.cursor()
     edgeSql = f"select * from {nodeDatabase}_edges_view where node_id_start = {nodeRecord['node_id']}"
