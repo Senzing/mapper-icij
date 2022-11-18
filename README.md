@@ -74,18 +74,15 @@ export PYTHONPATH=$PYTHONPATH:/senzing/mappers/mapper-base
 
 ### Configuring Senzing
 
-Loading ICIJ data into Senzing only requires registering the data souce.  No additional features or attributes are required.
-requires additional features and configurations.
-This configuration is contained in the [icij_config_updates.g2c](icij_config_updates.g2c) file.  To apply it, from
-your project's python directrory type ...
+*Note:* This only needs to be performed one time! In fact you may want to add these configuration updates to a master configuration file for all your data sources.
+
+Loading ICIJ data into Senzing only requires registering the data souce.  No additional features or attributes are
+required.  This configuration is contained in the [icij_config_updates.g2c](icij_config_updates.g2c) file.
+To apply it, from your Senzing project's python directrory type ...
 
 ```console
 python3 G2ConfigTool.py <path-to-file>/icij_config_updates.g2c
 ```
-
-*Note:* This only needs to be performed one time! In fact you may want to add these configuration updates to a master configuration file for all your data sources.
-
-
 
 This will step you through the process of adding any data sources, features, attributes and other settings needed to load this data into Senzing.
 After each command you will see a status message saying "success" or "already exists".
