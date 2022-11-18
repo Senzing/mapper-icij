@@ -27,7 +27,7 @@ Usage:
 
 ```console
 python icij_mapper.py --help
-usage: icij_mapper.py [-h] [-i INPUT_PATH] [-o OUTPUT_FILE] [-l LOG_FILE]
+usage: icij_mapper.py [-h] [-i INPUT_PATH] [-o OUTPUT_FILE] [-l LOG_FILE] [-a]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -37,6 +37,8 @@ optional arguments:
                         path and file name for the json output
   -l LOG_FILE, --log_file LOG_FILE
                         optional statistics filename (json format)
+  -a, --include_address_nodes
+                        include address nodes
 ```
 
 ## Contents
@@ -84,9 +86,9 @@ From the /opt/senzing/g2/python directory ...
 python3 G2ConfigTool.py <path-to-file>/icij_config_updates.g2c
 ```
 
-This will step you through the process of adding the data sources, entity types, features, attributes and other settings needed to load this watch list data into Senzing. After each command you will see a status message saying "success" or "already exists".  For instance, if you run the script twice, the second time through they will all say "already exists" which is OK.
-
-*Please note the use of ENTITY_TYPE is being deprecated in favor of RECORD_TYPE.  This mapper maps both for backwards compatibility.*
+This will step you through the process of adding any data sources, features, attributes and other settings needed to load this data into Senzing.
+After each command you will see a status message saying "success" or "already exists".
+For instance, if you run the script twice, the second time through they will all say "already exists" which is OK.
 
 ### Running the mapper
 
@@ -111,6 +113,10 @@ The mapper will read all the files and create one output file.  Example usage:
 ```console
 python3 icij_mapper.py -i /senzing/mappers/mapper-icij/input -o /senzing/mappers/mapper-icij/output/icij_2022.json
 ```
+- Add the -l --log_file argument to generate a mapping statistics file
+- Add the -a --include_address_nodes argument to generate the address nodes as well. *Please note that addresses from these nodes
+are mapped to their entities regardless of this setting.*
+
 
 ### Loading into Senzing
 

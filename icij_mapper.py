@@ -166,7 +166,9 @@ def processTable(fileDict):
     tableName = fileDict['tableName']
     
     #--these aren't entities
-    if nodeType in ['EDGES']: #, 'other']:  #--'address', go ahead and load addresses as entities
+    if nodeType == 'EDGES':
+        return 0
+    if nodeType == 'ADDRESS' and not include_address_nodes:
         return 0
 
     print('')
@@ -210,7 +212,6 @@ def processTable(fileDict):
 def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
     ''' map node to json structure '''
     
-
     # support for duplicate nodes
     # they are the same real entity, just of a different type as in entity vs intermediary
     node_id = str(nodeRecord['node_id'])
@@ -232,20 +233,19 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
 
     #--not all officers are actually people!
     if nodeType.upper() == 'OFFICER' and not baseLibrary.isCompanyName(entityName):
-        jsonData['ENTITY_TYPE'] = 'PERSON'
+        jsonData['RECORD_TYPE'] = 'PERSON'
         jsonData['PRIMARY_NAME_FULL'] = entityName
     elif nodeType.upper() == 'ADDRESS': 
-        jsonData['ENTITY_TYPE'] = 'ADDRESS'
-        jsonData['PRIMARY_NAME_FULL'] = nodeRecord.get('address', '')
+        jsonData['RECORD_TYPE'] = 'ADDRESS'
+        jsonData['PRIMARY_NAME_FULL'] = 'ADDRESS: ' + nodeRecord.get('address', '')
     else:
-        jsonData['ENTITY_TYPE'] = 'ORGANIZATION'
+        jsonData['RECORD_TYPE'] = 'ORGANIZATION'
         jsonData['PRIMARY_NAME_ORG'] = entityName
-    jsonData['RECORD_TYPE'] = jsonData['ENTITY_TYPE']
     jsonData['ICIJ_SOURCE'] = node_source
     jsonData['NODE_TYPE'] = nodeType
 
     updateStat('DATA_SOURCE', jsonData['DATA_SOURCE'])
-    updateStat('ENTITY_TYPE', jsonData['ENTITY_TYPE'])
+    updateStat('RECORD_TYPE', jsonData['RECORD_TYPE'])
     updateStat('SOURCE', node_source)
     updateStat('NODE_TYPE', nodeType.upper())
 
@@ -304,16 +304,17 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
                 else:
                     edgeRecord['link'] = edgeRecord['link'][0:50]
 
-        #--map the relationship
-        relPointerRecord = {}
-        relPointerRecord['REL_POINTER_DOMAIN'] = 'ICIJ_ID'
-        relPointerRecord['REL_POINTER_KEY'] = edgeRecord['node2_id']
-        relPointerRecord['REL_POINTER_ROLE'] = edgeRecord['link']
-        if edgeRecord['start_date']:
-            relPointerRecord['REL_POINTER_FROM_DATE'] = edgeRecord['start_date']
-        if edgeRecord['end_date']:
-            relPointerRecord['REL_POINTER_THRU_DATE'] = edgeRecord['end_date']
-        relPointerList.append(relPointerRecord)
+        #--map the relationship if not and address unless including them as nodes
+        if edgeRecord['node2_type'] != 'address' or include_address_nodes:
+            relPointerRecord = {}
+            relPointerRecord['REL_POINTER_DOMAIN'] = 'ICIJ_ID'
+            relPointerRecord['REL_POINTER_KEY'] = edgeRecord['node2_id']
+            relPointerRecord['REL_POINTER_ROLE'] = edgeRecord['link']
+            if edgeRecord['start_date']:
+                relPointerRecord['REL_POINTER_FROM_DATE'] = edgeRecord['start_date']
+            if edgeRecord['end_date']:
+                relPointerRecord['REL_POINTER_THRU_DATE'] = edgeRecord['end_date']
+            relPointerList.append(relPointerRecord)
 
         #--map the related node as an address if it is one
         if edgeRecord['node2_type'] == 'address':
@@ -324,7 +325,7 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
                     addressList.append(addressRecord)
 
         #--map the related node as a group name so can be used for matching if its an officer pointing to an entity
-        if jsonData['ENTITY_TYPE'] == 'PERSON' and edgeRecord['node2_type'] == 'entity':
+        if jsonData['RECORD_TYPE'] == 'PERSON' and edgeRecord['node2_type'] == 'entity':
             if edgeRecord['node2_type'] == 'entity': #--should always be true
                 groupAssociationRecord = {"GROUP_ASSOCIATION_ORG_NAME": edgeRecord['node2_desc']}
                 if groupAssociationRecord not in groupAssociationList:
@@ -335,7 +336,7 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
     if addressList:
         jsonData['ADDRESSES'] = addressList
 
-    if groupAssociationList and jsonData['ENTITY_TYPE'] == 'PERSON':
+    if groupAssociationList and jsonData['RECORD_TYPE'] == 'PERSON':
         jsonData['GROUP_ASSOCATIONS'] = groupAssociationList
 
     if relPointerList:
@@ -357,10 +358,12 @@ if __name__ == '__main__':
     argparser.add_argument('-i', '--input_path', default=os.getenv('input_path'.upper(), None), type=str, help='path to the downloaded ICIJ csv files')
     argparser.add_argument('-o', '--output_file', default=os.getenv('output_file'.upper(), None), type=str, help='path and file name for the json output')
     argparser.add_argument('-l', '--log_file', default=os.getenv('log_file'.upper(), None), type=str, help='optional statistics filename (json format)')
+    argparser.add_argument('-a', '--include_address_nodes', dest='include_address_nodes', action='store_true', default=False, help='include address nodes')
     args = argparser.parse_args()
     inputPath = args.input_path
     outputFileName = args.output_file
     logFile = args.log_file
+    include_address_nodes = args.include_address_nodes
 
     if not (inputPath):
         print('')
@@ -405,7 +408,7 @@ if __name__ == '__main__':
 
     #--initialize the statpack
     statPack = {}
-    node_cache = {} # to suppot dupicate node IDs
+    node_cache = {} # to support dupicate node IDs
 
     #--process each table
     for fileDict in inputFiles:
