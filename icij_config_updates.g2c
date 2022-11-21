@@ -1,7 +1,3 @@
 addDataSource ICIJ
 
-addEntityType PERSON
-addEntityType ORGANIZATION
-addEntityType ADDRESS
-
 save
