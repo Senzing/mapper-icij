@@ -10,6 +10,7 @@ import json
 import re
 import pandas
 import sqlite3
+import random
 
 #--try to import the base mapper library and variants
 try: 
@@ -248,8 +249,6 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
     jsonData['ICIJ_SOURCE'] = node_source
     jsonData['NODE_TYPE'] = nodeType
 
-    updateStat('DATA_SOURCE', jsonData['DATA_SOURCE'])
-    updateStat('RECORD_TYPE', jsonData['RECORD_TYPE'])
     updateStat('SOURCE', node_source)
     updateStat('NODE_TYPE', nodeType.upper())
 
@@ -290,7 +289,10 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
     groupAssociationList = []
     addressList = []
     if entityAddress:
-        addressList.append({"ADDR_TYPE": "PRIMARY", "ADDR_FULL": entityAddress})
+        if jsonData['RECORD_TYPE'] == 'PERSON':
+            addressList.append({"ADDR_TYPE": "PRIMARY", "ADDR_FULL": entityAddress})
+        else:
+            addressList.append({"ADDR_TYPE": "BUSINESS", "ADDR_FULL": entityAddress})
 
     edgeObj = conn.cursor()
     edgeSql = f"select * from {nodeDatabase}_edges_view where node_id_start = {nodeRecord['node_id']}"
@@ -324,6 +326,8 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
         if edgeRecord['node2_type'] == 'address':
             if edgeRecord['node2_desc'] not in addressList:
                 addrType = edgeRecord['link'].upper().replace(' ADDRESS', '')[0:50] if edgeRecord['link'] else 'ADDRESS'
+                if jsonData['RECORD_TYPE'] == 'ORGANIZATION' and ('REGISTERED' in addrType or 'BUSINESS' in addrType):
+                    addrType = 'BUSINESS'
                 addressRecord = {"ADDR_TYPE": addrType, "ADDR_FULL": edgeRecord['node2_desc']}
                 if addressRecord not in addressList:
                     addressList.append(addressRecord)
@@ -345,6 +349,15 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
 
     if relPointerList:
         jsonData['RELATIONSHIPS'] = relPointerList
+
+    node_type = jsonData.get('NODE_TYPE', 'UNKNOWN')
+    for key1 in jsonData:
+        if type(jsonData[key1]) != list:
+            updateStat(node_type, key1, jsonData[key1])
+        else:
+            for subrecord in jsonData[key1]:
+                for key2 in subrecord:
+                    updateStat(node_type, key2, subrecord[key2])
 
     return jsonData
 
