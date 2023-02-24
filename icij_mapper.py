@@ -5,17 +5,15 @@ import os
 import argparse
 import signal
 import time
-from datetime import datetime, timedelta
 import json
-import re
 import pandas
 import sqlite3
 import random
 
 #--try to import the base mapper library and variants
-try: 
+try:
     import base_mapper
-except: 
+except:
     print('')
     print('Please export PYTHONPATH=$PYTHONPATH:<path to mapper-base project>')
     print('')
@@ -25,22 +23,11 @@ if not baseLibrary.initialized:
     sys.exit(1)
 
 #----------------------------------------
-def pause(question='PRESS ENTER TO CONTINUE ...'):
-    """ pause for debug purposes """
-    try: response = input(question)
-    except KeyboardInterrupt:
-        response = None
-        global shutDown
-        shutDown = True
-    return response
-
-#----------------------------------------
 def signal_handler(signal, frame):
     print('USER INTERUPT! Shutting down ... (please wait)')
     global shutDown
     shutDown = True
-    return
-        
+
 #----------------------------------------
 def updateStat(cat1, cat2, example = None):
     if cat1 not in statPack:
@@ -59,7 +46,6 @@ def updateStat(cat1, cat2, example = None):
             else:
                 randomSampleI = random.randint(2,4)
                 statPack[cat1][cat2]['examples'][randomSampleI] = example
-    return
 
 #----------------------------------------
 def csv2db():
@@ -89,14 +75,14 @@ def csv2db():
             else:
 
                 conn.cursor().execute('create index ix_%s1 on %s (node_id_start)' % (fileDict['tableName'], fileDict['tableName']))
-                
+
                 sql = "create view %s_view as " % (fileDict['nodeDatabase'] + '_edges',)
                 sql += "select  "
                 sql += " a.node_id_start, "
                 sql += " case when b.node_id is null then "
                 sql += "  case when c.node_id is null then "
                 sql += "   case when d.node_id is null then "
-                sql += "    case when e.node_id is null then null " 
+                sql += "    case when e.node_id is null then null "
                 sql += "     else e.node_id end "
                 sql += "    else d.node_id end "
                 sql += "   else c.node_id end "
@@ -104,7 +90,7 @@ def csv2db():
                 sql += " case when b.node_id is null then "
                 sql += "  case when c.node_id is null then "
                 sql += "   case when d.node_id is null then "
-                sql += "    case when e.node_id is null then null " 
+                sql += "    case when e.node_id is null then null "
                 sql += "     else 'address' end "
                 sql += "    else 'officer' end "
                 sql += "   else 'intermediary' end "
@@ -112,18 +98,18 @@ def csv2db():
                 sql += " case when b.node_id is null then "
                 sql += "  case when c.node_id is null then "
                 sql += "   case when d.node_id is null then "
-                sql += "    case when e.node_id is null then null " 
+                sql += "    case when e.node_id is null then null "
                 sql += "     else case when e.name is null then e.address else e.name end end "
                 sql += "    else d.name end "
                 sql += "   else c.name end "
                 sql += "  else b.name end as node1_desc, "
                 sql += " a.rel_type, "
-                sql += " a.link, " 
+                sql += " a.link, "
                 sql += " a.node_id_end, "
                 sql += " case when f.node_id is null then "
                 sql += "  case when g.node_id is null then "
                 sql += "   case when h.node_id is null then "
-                sql += "    case when i.node_id is null then null " 
+                sql += "    case when i.node_id is null then null "
                 sql += "     else i.node_id end "
                 sql += "    else h.node_id end "
                 sql += "   else g.node_id end "
@@ -131,7 +117,7 @@ def csv2db():
                 sql += " case when f.node_id is null then "
                 sql += "  case when g.node_id is null then "
                 sql += "   case when h.node_id is null then "
-                sql += "    case when i.node_id is null then null " 
+                sql += "    case when i.node_id is null then null "
                 sql += "     else 'address' end "
                 sql += "    else 'officer' end "
                 sql += "   else 'intermediary' end "
@@ -157,15 +143,13 @@ def csv2db():
                 sql += "left join %s i on i.node_id = a.node_id_end "  % (fileDict['nodeDatabase'] + '_address', )
                 conn.cursor().execute(sql)
 
-    return
-
 #----------------------------------------
 def processTable(fileDict):
 
     nodeDatabase = fileDict['nodeDatabase']
     nodeType = fileDict['nodeType'].upper()
     tableName = fileDict['tableName']
-    
+
     #--these aren't entities
     if nodeType == 'EDGES':
         return 0
@@ -174,7 +158,7 @@ def processTable(fileDict):
 
     print('')
     print('processing %s ...' % tableName)
-    
+
     #--process the records
     dbObj = conn.cursor()
     dbCursor = dbObj.execute('select * from ' + tableName)
@@ -184,11 +168,8 @@ def processTable(fileDict):
     while dbRow:
         rowCount += 1
         nodeRecord = dict(zip(dbHeader, dbRow))
-        jsonData = node2Json(tableName, nodeRecord, nodeDatabase, nodeType)
+        jsonData = node2Json(nodeRecord, nodeDatabase, nodeType)
         msg = json.dumps(jsonData)
-        #if len(msg) > 100000:
-        #    print(msg)
-        #   pause()
 
         try: outputFileHandle.write(msg + '\n')
         except IOError as err:
@@ -210,9 +191,9 @@ def processTable(fileDict):
     return shutDown
 
 #----------------------------------------
-def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
+def node2Json(nodeRecord, nodeDatabase, nodeType):
     ''' map node to json structure '''
-    
+
     # support for duplicate nodes
     # they are the same real entity, just of a different type as in entity vs intermediary
     node_id = str(nodeRecord['node_id'])
@@ -237,7 +218,7 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
     if nodeType.upper() == 'OFFICER' and not baseLibrary.isCompanyName(entityName):
         jsonData['RECORD_TYPE'] = 'PERSON'
         jsonData['PRIMARY_NAME_FULL'] = entityName
-    elif nodeType.upper() == 'ADDRESS': 
+    elif nodeType.upper() == 'ADDRESS':
         jsonData['RECORD_TYPE'] = 'ADDRESS'
         # address nodes sometimes have the address in the name field
         if entityName and not entityAddress:
@@ -351,13 +332,13 @@ def node2Json(tableName, nodeRecord, nodeDatabase, nodeType):
         jsonData['RELATIONSHIPS'] = relPointerList
 
     node_type = jsonData.get('NODE_TYPE', 'UNKNOWN')
-    for key1 in jsonData:
-        if type(jsonData[key1]) != list:
-            updateStat(node_type, key1, jsonData[key1])
-        else:
+    for key1 in jsonData.keys():
+        if isinstance(jsonData[key1], list):
             for subrecord in jsonData[key1]:
-                for key2 in subrecord:
+                for key2 in subrecord.keys():
                     updateStat(node_type, key2, subrecord[key2])
+        else:
+            updateStat(node_type, key1, jsonData[key1])
 
     return jsonData
 
@@ -436,11 +417,11 @@ if __name__ == '__main__':
     outputFileHandle.close()
 
     #--write statistics file
-    if logFile: 
+    if logFile:
         print('')
         statPack['BASE_LIBRARY'] = baseLibrary.statPack
         with open(logFile, 'w') as outfile:
-            json.dump(statPack, outfile, indent=4, sort_keys = True)    
+            json.dump(statPack, outfile, indent=4, sort_keys = True)
         print('Mapping stats written to %s' % logFile)
 
     print('')
@@ -450,5 +431,5 @@ if __name__ == '__main__':
     else:
         print('Process aborted after %s minutes!' % elapsedMins)
     print('')
-    
+
     sys.exit(0)

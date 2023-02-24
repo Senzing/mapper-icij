@@ -17,12 +17,9 @@ disable=
     too-many-branches,
     too-many-locals,
     too-many-statements,
-    trailing-whitespace,
     undefined-variable,
     unspecified-encoding,
     unused-argument,
-    unused-import,
-    useless-return,
     wrong-import-order,
 good-names=
     template-python
