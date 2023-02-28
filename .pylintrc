@@ -1,6 +1,8 @@
 [pylint]
 disable=
     bare-except,
+    consider-iterating-dictionary,
+    consider-using-dict-items,
     consider-using-enumerate,
     consider-using-f-string,
     consider-using-with,
