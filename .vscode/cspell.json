@@ -11,6 +11,7 @@
     "CODEOWNER",
     "icij",
     "ICLA",
+    "mypy",
     "oldb",
     "pylint",
     "PYTHONPATH",
