@@ -126,15 +126,15 @@ python3 G2Loader.py -f /senzing/mappers/mapper-icij/output/icij_2022.json
 
 This data set currently contains about 1.9 million records and make take an hour or more to load depending on your hardware.
 
-[icij_mapper.py]: icij_mapper.py
-[here]: https://offshoreleaks-data.icij.org/offshoreleaks/csv/full-oldb.20220503.zip
-[icij_2022.json.zip]: https://public-read-access.s3.amazonaws.com/mapped-data-sets/icij-offshore-leaks/icij_2022.json.zip
-[Prerequisites]: #prerequisites
-[Installation]: #installation
 [Configuring Senzing]: #configuring-senzing
-[Running the mapper]: #running-the-mapper
-[Loading into Senzing]: #loading-into-senzing
-[Senzing/mapper-base]: https://github.com/Senzing/mapper-base
-[icij_config_updates.g2c]: icij_config_updates.g2c
-[https://offshoreleaks.icij.org/pages/database]: https://offshoreleaks.icij.org/pages/database
 [download page]: images/download_page.jpg
+[here]: https://offshoreleaks-data.icij.org/offshoreleaks/csv/full-oldb.20220503.zip
+[https://offshoreleaks.icij.org/pages/database]: https://offshoreleaks.icij.org/pages/database
+[icij_2022.json.zip]: https://public-read-access.s3.amazonaws.com/mapped-data-sets/icij-offshore-leaks/icij_2022.json.zip
+[icij_config_updates.g2c]: src/icij_config_updates.g2c
+[icij_mapper.py]: src/icij_mapper.py
+[Installation]: #installation
+[Loading into Senzing]: #loading-into-senzing
+[Prerequisites]: #prerequisites
+[Running the mapper]: #running-the-mapper
+[Senzing/mapper-base]: https://github.com/Senzing/mapper-base
