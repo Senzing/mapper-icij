@@ -1,4 +1,4 @@
-bandit==1.8.5
+bandit==1.9.2
 black==25.1.0
 build==1.2.2.post1
 coverage==7.9.2
