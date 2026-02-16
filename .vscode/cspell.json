@@ -19,6 +19,7 @@
     "isort",
     "jquery",
     "jsmath",
+    "kernelsam",
     "kwargs",
     "mypy",
     "oldb",
