@@ -1,4 +1,15 @@
+# Senzing configuration for the ICIJ mapper. Apply with: sz_configtool -f icij_config_updates.g2c
+#
+# The mapper writes REL_POINTER_FROM_DATE / REL_POINTER_THRU_DATE on each relationship. The default
+# REL_POINTER feature has no date elements, so the two elements are created and attached to REL_POINTER
+# before the attributes that map onto them (without that, addAttribute fails with
+# "Element 'USED_FROM_DT' not found"). Verified with sz_configtool on Senzing 4.4.3.
 addDataSource ICIJ
+
+addElement {"element": "USED_FROM_DT", "datatype": "date"}
+addElement {"element": "USED_THRU_DT", "datatype": "date"}
+addElementToFeature {"feature": "REL_POINTER", "element": "USED_FROM_DT", "derived": "No", "display": "Yes"}
+addElementToFeature {"feature": "REL_POINTER", "element": "USED_THRU_DT", "derived": "No", "display": "Yes"}
 
 addAttribute {"attribute": "REL_POINTER_FROM_DATE", "class": "RELATIONSHIP", "feature": "REL_POINTER", "element": "USED_FROM_DT", "required": "No", "default": "", "advanced": "No", "internal": "No"}
 addAttribute {"attribute": "REL_POINTER_THRU_DATE", "class": "RELATIONSHIP", "feature": "REL_POINTER", "element": "USED_THRU_DT", "required": "No", "default": "", "advanced": "No", "internal": "No"}
