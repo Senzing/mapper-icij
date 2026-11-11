@@ -23,7 +23,7 @@ Usage:
 
 ```console
 python icij_mapper.py --help
-usage: icij_mapper.py [-h] [-i INPUT_PATH] [-o OUTPUT_FILE] [-l LOG_FILE] [-a]
+usage: icij_mapper.py [-h] [-i INPUT_PATH] [-o OUTPUT_FILE] [-l LOG_FILE] [-d DATABASE_FILE] [-a]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -33,6 +33,8 @@ optional arguments:
                         path and file name for the json output
   -l LOG_FILE, --log_file LOG_FILE
                         optional statistics filename (json format)
+  -d DATABASE_FILE, --database_file DATABASE_FILE
+                        optional sqlite work database to create (default: a temporary one next to the output file)
   -a, --include_address_nodes
                         include address nodes
 ```
@@ -76,17 +78,18 @@ export PYTHONPATH=$PYTHONPATH:/senzing/mappers/mapper-base
 
 _Note:_ This only needs to be performed one time! In fact you may want to add these configuration updates to a master configuration file for all your data sources.
 
-Loading ICIJ data into Senzing only requires registering the data source. No additional features or attributes are
-required. This configuration is contained in the [icij_config_updates.g2c] file.
-To apply it, from your Senzing project's python directory type ...
+Loading ICIJ data into Senzing requires registering the data source and the two relationship-date attributes the
+mapper writes on each relationship (REL_POINTER_FROM_DATE / REL_POINTER_THRU_DATE). The default REL_POINTER feature has
+no date elements, so the script first creates the USED_FROM_DT / USED_THRU_DT elements and attaches them to
+REL_POINTER. This configuration is contained in the [icij_config_updates.g2c] file (verified on Senzing 4.4.3).
+To apply it ...
 
 ```console
-python3 G2ConfigTool.py <path-to-file>/icij_config_updates.g2c
+sz_configtool -f <path-to-file>/icij_config_updates.g2c
 ```
 
-This will step you through the process of adding any data sources, features, attributes and other settings needed to load this data into Senzing.
-After each command you will see a status message saying "success" or "already exists".
-For instance, if you run the script twice, the second time through they will all say "already exists" which is OK.
+sz_configtool does not save when a command fails, so on a configuration that already has any of these (for example
+the ICIJ data source), remove those lines first.
 
 ### Running the mapper
 
@@ -113,8 +116,22 @@ python3 icij_mapper.py -i /senzing/mappers/mapper-icij/input -o /senzing/mappers
 ```
 
 - Add the -l --log_file argument to generate a mapping statistics file
+- The mapper loads the csv files into a temporary sqlite database next to the output file and removes it when done; add
+  -d --database_file to keep it at a path of your choice. The input folder is never written to.
 - Add the -a --include*address_nodes argument to generate the address nodes as well. \_Please note that addresses from these nodes
   are mapped to their entities regardless of this setting.*
+
+### Output format
+
+Each record follows the Senzing Entity Specification's recommended shape: DATA_SOURCE, RECORD_ID and scalar payload
+(ICIJ_SOURCE, NODE_TYPE, Jurisdiction, Status, COMPANY_TYPE, INCORPORATED, INACTIVATED, STRUCK_OFF, NOTES) at the root,
+and every feature as one object in the FEATURES list: RECORD_TYPE, the PRIMARY name (NAME_ORG or NAME_FULL), each
+address, each COUNTRY_OF_ASSOCIATION, each GROUP_ASSOCIATION_ORG_NAME, the REL_ANCHOR and one REL_POINTER per
+relationship (REL_POINTER_KEY is a string, like the REL_ANCHOR_KEY it points at).
+
+A node id that appears in more than one node file (the same real entity listed, for example, as both an intermediary
+and an officer) is written once per file: the first as RECORD_ID `<node id>`, the others as `<node id>-<n>`. All of
+them anchor on the bare node id, which is what the relationships point to.
 
 ### Loading into Senzing
 

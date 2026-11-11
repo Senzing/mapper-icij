@@ -9,6 +9,9 @@ import json
 import pandas
 import sqlite3
 import random
+import shutil
+import tempfile
+import atexit
 
 # --try to import the base mapper library and variants
 try:
@@ -19,9 +22,7 @@ except:
     print("")
     sys.exit(1)
 baseLibrary = base_mapper.base_library(
-    os.path.abspath(base_mapper.__file__).replace(
-        "base_mapper.py", "base_variants.json"
-    )
+    os.path.abspath(base_mapper.__file__).replace("base_mapper.py", "base_variants.json")
 )
 if not baseLibrary.initialized:
     sys.exit(1)
@@ -60,8 +61,7 @@ def csv2db():
     for fileDict in inputFiles:
         dbObj = conn.cursor()
         dbCursor = dbObj.execute(
-            "select name from sqlite_master where type='table' AND name='%s'"
-            % fileDict["tableName"]
+            "select name from sqlite_master where type='table' AND name='%s'" % fileDict["tableName"]
         )
         dbRow = dbCursor.fetchone()
         if not dbRow:
@@ -77,25 +77,19 @@ def csv2db():
             # nodes-officers.csv node_id column <-> relationships.csv node_id_start column <-> relationships.csv node_id_end column <-> nodes-entities.csv node_id column
 
             fileDict["fileName"] = (
-                inputPath
-                + (os.path.sep if inputPath[-1:] != os.path.sep else "")
-                + fileDict["fileName"]
+                inputPath + (os.path.sep if inputPath[-1:] != os.path.sep else "") + fileDict["fileName"]
             )
             print("loading %s ..." % fileDict["fileName"])
-            df = pandas.read_csv(
-                fileDict["fileName"], low_memory=False, encoding="utf-8", quotechar='"'
-            )
+            df = pandas.read_csv(fileDict["fileName"], low_memory=False, encoding="utf-8", quotechar='"')
             df.to_sql(fileDict["tableName"], conn, if_exists="replace")
             if fileDict["nodeType"] != "edges":
                 conn.cursor().execute(
-                    "create index ix_%s on %s (node_id)"
-                    % (fileDict["tableName"], fileDict["tableName"])
+                    "create index ix_%s on %s (node_id)" % (fileDict["tableName"], fileDict["tableName"])
                 )
             else:
 
                 conn.cursor().execute(
-                    "create index ix_%s1 on %s (node_id_start)"
-                    % (fileDict["tableName"], fileDict["tableName"])
+                    "create index ix_%s1 on %s (node_id_start)" % (fileDict["tableName"], fileDict["tableName"])
                 )
 
                 sql = "create view %s_view as " % (fileDict["nodeDatabase"] + "_edges",)
@@ -155,30 +149,14 @@ def csv2db():
                 sql += " a.start_date, "
                 sql += " a.end_date "
                 sql += "from %s a " % (fileDict["nodeDatabase"] + "_edges",)
-                sql += "left join %s b on b.node_id = a.node_id_start " % (
-                    fileDict["nodeDatabase"] + "_entity",
-                )
-                sql += "left join %s c on c.node_id = a.node_id_start " % (
-                    fileDict["nodeDatabase"] + "_intermediary",
-                )
-                sql += "left join %s d on d.node_id = a.node_id_start " % (
-                    fileDict["nodeDatabase"] + "_officer",
-                )
-                sql += "left join %s e on e.node_id = a.node_id_start " % (
-                    fileDict["nodeDatabase"] + "_address",
-                )
-                sql += "left join %s f on f.node_id = a.node_id_end " % (
-                    fileDict["nodeDatabase"] + "_entity",
-                )
-                sql += "left join %s g on g.node_id = a.node_id_end " % (
-                    fileDict["nodeDatabase"] + "_intermediary",
-                )
-                sql += "left join %s h on h.node_id = a.node_id_end " % (
-                    fileDict["nodeDatabase"] + "_officer",
-                )
-                sql += "left join %s i on i.node_id = a.node_id_end " % (
-                    fileDict["nodeDatabase"] + "_address",
-                )
+                sql += "left join %s b on b.node_id = a.node_id_start " % (fileDict["nodeDatabase"] + "_entity",)
+                sql += "left join %s c on c.node_id = a.node_id_start " % (fileDict["nodeDatabase"] + "_intermediary",)
+                sql += "left join %s d on d.node_id = a.node_id_start " % (fileDict["nodeDatabase"] + "_officer",)
+                sql += "left join %s e on e.node_id = a.node_id_start " % (fileDict["nodeDatabase"] + "_address",)
+                sql += "left join %s f on f.node_id = a.node_id_end " % (fileDict["nodeDatabase"] + "_entity",)
+                sql += "left join %s g on g.node_id = a.node_id_end " % (fileDict["nodeDatabase"] + "_intermediary",)
+                sql += "left join %s h on h.node_id = a.node_id_end " % (fileDict["nodeDatabase"] + "_officer",)
+                sql += "left join %s i on i.node_id = a.node_id_end " % (fileDict["nodeDatabase"] + "_address",)
                 conn.cursor().execute(sql)
 
 
@@ -225,13 +203,19 @@ def processTable(fileDict):
 
         dbRow = dbCursor.fetchone()
         if rowCount % progressInterval == 0 or not dbRow:
-            print(
-                " %s %s written%s"
-                % (rowCount, tableName, ", complete!" if not dbRow else "")
-            )
+            print(" %s %s written%s" % (rowCount, tableName, ", complete!" if not dbRow else ""))
 
     # --return error if dd not complete
     return shutDown
+
+
+# ----------------------------------------
+def fetchEdges(nodeDatabase, nodeId):
+    """outbound edges of a node, as dicts of the <nodeDatabase>_edges_view columns"""
+    edgeObj = conn.cursor()
+    edgeCursor = edgeObj.execute(f"select * from {nodeDatabase}_edges_view where node_id_start = ?", (nodeId,))
+    edgeHeader = [col[0] for col in edgeObj.description]
+    return [dict(zip(edgeHeader, edgeRow)) for edgeRow in edgeCursor.fetchall()]
 
 
 # ----------------------------------------
@@ -241,16 +225,38 @@ def node2Json(nodeRecord, nodeDatabase, nodeType):
     # support for duplicate nodes
     # they are the same real entity, just of a different type as in entity vs intermediary
     node_id = str(nodeRecord["node_id"])
+    record_id = node_id
     if node_id in node_cache:
         node_cache[node_id] += 1
-        node_id = f"{node_id}-{node_cache[node_id]}"
+        record_id = f"{node_id}-{node_cache[node_id]}"
     else:
         node_cache[node_id] = 0
 
-    # --set the data source
-    jsonData = {}
-    jsonData["DATA_SOURCE"] = "ICIJ"
-    jsonData["RECORD_ID"] = node_id
+    jsonData = mapNode(nodeRecord, nodeDatabase, nodeType, record_id, fetchEdges(nodeDatabase, nodeRecord["node_id"]))
+
+    node_type = jsonData.get("NODE_TYPE", "UNKNOWN")
+    for key1, value in jsonData.items():
+        if key1 == "FEATURES":
+            for feature in value:
+                for key2, value2 in feature.items():
+                    updateStat(node_type, key2, value2)
+        else:
+            updateStat(node_type, key1, value)
+    return jsonData
+
+
+# ----------------------------------------
+def mapNode(nodeRecord, nodeDatabase, nodeType, record_id, edges):
+    """map one node and its outbound edges to a Senzing record in the FEATURES-array shape
+
+    Every feature is one object in FEATURES; the root holds only DATA_SOURCE, RECORD_ID and scalar payload.
+    record_id is the node id, or "<node id>-<n>" for the n-th repeat of a node id that appears in more than
+    one node file (the same real entity listed e.g. as both intermediary and officer). The anchor key is
+    always the bare node id, because that is what the edges point to: every record of the node is reachable.
+    """
+    node_id = str(nodeRecord["node_id"])
+    jsonData = {"DATA_SOURCE": "ICIJ", "RECORD_ID": record_id}
+    features = []
 
     entityName = nodeRecord.get("name", "")
     entityAddress = nodeRecord.get("address", "")
@@ -260,35 +266,32 @@ def node2Json(nodeRecord, nodeDatabase, nodeType):
 
     # --not all officers are actually people!
     if nodeType.upper() == "OFFICER" and not baseLibrary.isCompanyName(entityName):
-        jsonData["RECORD_TYPE"] = "PERSON"
-        jsonData["PRIMARY_NAME_FULL"] = entityName
+        recordType = "PERSON"
+        nameFeature = {"NAME_TYPE": "PRIMARY", "NAME_FULL": entityName}
     elif nodeType.upper() == "ADDRESS":
-        jsonData["RECORD_TYPE"] = "ADDRESS"
+        recordType = "ADDRESS"
+        nameFeature = None
         # address nodes sometimes have the address in the name field
         if entityName and not entityAddress:
             entityAddress = entityName
-
     else:
-        jsonData["RECORD_TYPE"] = "ORGANIZATION"
-        jsonData["PRIMARY_NAME_ORG"] = entityName
+        recordType = "ORGANIZATION"
+        nameFeature = {"NAME_TYPE": "PRIMARY", "NAME_ORG": entityName}
+    features.append({"RECORD_TYPE": recordType})
+    if nameFeature and entityName:
+        features.append(nameFeature)
     jsonData["ICIJ_SOURCE"] = node_source
     jsonData["NODE_TYPE"] = nodeType
 
     updateStat("SOURCE", node_source)
     updateStat("NODE_TYPE", nodeType.upper())
 
-    countryList = []
     if "jurisdiction" in nodeRecord and nodeRecord["jurisdiction"]:
         jsonData["Jurisdiction"] = nodeRecord["jurisdiction"]
-        countryList.append({"COUNTRY_OF_ASSOCIATION": nodeRecord["jurisdiction"]})
+        features.append({"COUNTRY_OF_ASSOCIATION": nodeRecord["jurisdiction"]})
     if "country_codes" in nodeRecord and nodeRecord["country_codes"]:
-        country_links = []
         for linkedCountry in nodeRecord["country_codes"].split(";"):
-            country_links.append(linkedCountry)
-            countryList.append({"COUNTRY_OF_ASSOCIATION": linkedCountry})
-        nodeRecord["Linked to"] = " | ".join(country_links)
-    if countryList:
-        jsonData["COUNTRIES"] = countryList
+            features.append({"COUNTRY_OF_ASSOCIATION": linkedCountry})
 
     if "status" in nodeRecord and nodeRecord["status"]:  # --officers don't have status
         jsonData["Status"] = nodeRecord["status"]
@@ -306,27 +309,19 @@ def node2Json(nodeRecord, nodeDatabase, nodeType):
         jsonData["NOTES"] = nodeRecord["note"]
 
     # --add the anchor so that others can relate to this node
-    jsonData["REL_ANCHOR_DOMAIN"] = "ICIJ_ID"
-    jsonData["REL_ANCHOR_KEY"] = jsonData["RECORD_ID"]
+    features.append({"REL_ANCHOR_DOMAIN": "ICIJ_ID", "REL_ANCHOR_KEY": node_id})
 
     # --map related nodes as addresses, group associations and disclosed relationships
     relPointerList = []
     groupAssociationList = []
     addressList = []
     if entityAddress:
-        if jsonData["RECORD_TYPE"] == "PERSON":
+        if recordType == "PERSON":
             addressList.append({"ADDR_TYPE": "PRIMARY", "ADDR_FULL": entityAddress})
         else:
             addressList.append({"ADDR_TYPE": "BUSINESS", "ADDR_FULL": entityAddress})
 
-    edgeObj = conn.cursor()
-    edgeSql = f"select * from {nodeDatabase}_edges_view where node_id_start = {nodeRecord['node_id']}"
-    edgeCursor = edgeObj.execute(edgeSql)
-    edgeHeader = [col[0] for col in edgeObj.description]
-    edgeRow = edgeCursor.fetchone()
-    while edgeRow:
-        edgeRecord = dict(zip(edgeHeader, edgeRow))
-
+    for edgeRecord in edges:
         if edgeRecord["link"]:  # --fix long usage types
             if len(edgeRecord["link"]) > 50:
                 updateStat("TRUNCATED_LINKS", edgeRecord["link"])
@@ -336,11 +331,11 @@ def node2Json(nodeRecord, nodeDatabase, nodeType):
                     edgeRecord["link"] = edgeRecord["link"][0:50]
 
         # --map the relationship if not and address unless including them as nodes
-        if edgeRecord["node2_type"] != "address" or include_address_nodes:
-            relPointerRecord = {}
-            relPointerRecord["REL_POINTER_DOMAIN"] = "ICIJ_ID"
-            relPointerRecord["REL_POINTER_KEY"] = edgeRecord["node2_id"]
-            relPointerRecord["REL_POINTER_ROLE"] = edgeRecord["link"]
+        if edgeRecord["node2_id"] is not None and (edgeRecord["node2_type"] != "address" or include_address_nodes):
+            # --the key must be a string, like the anchor key it points at
+            relPointerRecord = {"REL_POINTER_DOMAIN": "ICIJ_ID", "REL_POINTER_KEY": str(edgeRecord["node2_id"])}
+            if edgeRecord["link"]:
+                relPointerRecord["REL_POINTER_ROLE"] = edgeRecord["link"]
             if edgeRecord["start_date"]:
                 relPointerRecord["REL_POINTER_FROM_DATE"] = edgeRecord["start_date"]
             if edgeRecord["end_date"]:
@@ -348,53 +343,24 @@ def node2Json(nodeRecord, nodeDatabase, nodeType):
             relPointerList.append(relPointerRecord)
 
         # --map the related node as an address if it is one
-        if edgeRecord["node2_type"] == "address":
-            if edgeRecord["node2_desc"] not in addressList:
-                addrType = (
-                    edgeRecord["link"].upper().replace(" ADDRESS", "")[0:50]
-                    if edgeRecord["link"]
-                    else "ADDRESS"
-                )
-                if jsonData["RECORD_TYPE"] == "ORGANIZATION" and (
-                    "REGISTERED" in addrType or "BUSINESS" in addrType
-                ):
-                    addrType = "BUSINESS"
-                addressRecord = {
-                    "ADDR_TYPE": addrType,
-                    "ADDR_FULL": edgeRecord["node2_desc"],
-                }
-                if addressRecord not in addressList:
-                    addressList.append(addressRecord)
+        if edgeRecord["node2_type"] == "address" and edgeRecord["node2_desc"]:
+            addrType = edgeRecord["link"].upper().replace(" ADDRESS", "")[0:50] if edgeRecord["link"] else "ADDRESS"
+            if recordType == "ORGANIZATION" and ("REGISTERED" in addrType or "BUSINESS" in addrType):
+                addrType = "BUSINESS"
+            addressRecord = {"ADDR_TYPE": addrType, "ADDR_FULL": edgeRecord["node2_desc"]}
+            if addressRecord not in addressList:
+                addressList.append(addressRecord)
 
         # --map the related node as a group name so can be used for matching if its an officer pointing to an entity
-        if jsonData["RECORD_TYPE"] == "PERSON" and edgeRecord["node2_type"] == "entity":
-            if edgeRecord["node2_type"] == "entity":  # --should always be true
-                groupAssociationRecord = {
-                    "GROUP_ASSOCIATION_ORG_NAME": edgeRecord["node2_desc"]
-                }
-                if groupAssociationRecord not in groupAssociationList:
-                    groupAssociationList.append(groupAssociationRecord)
+        if recordType == "PERSON" and edgeRecord["node2_type"] == "entity" and edgeRecord["node2_desc"]:
+            groupAssociationRecord = {"GROUP_ASSOCIATION_ORG_NAME": edgeRecord["node2_desc"]}
+            if groupAssociationRecord not in groupAssociationList:
+                groupAssociationList.append(groupAssociationRecord)
 
-        edgeRow = edgeCursor.fetchone()
-
-    if addressList:
-        jsonData["ADDRESSES"] = addressList
-
-    if groupAssociationList and jsonData["RECORD_TYPE"] == "PERSON":
-        jsonData["GROUP_ASSOCIATIONS"] = groupAssociationList
-
-    if relPointerList:
-        jsonData["RELATIONSHIPS"] = relPointerList
-
-    node_type = jsonData.get("NODE_TYPE", "UNKNOWN")
-    for key1 in jsonData.keys():
-        if isinstance(jsonData[key1], list):
-            for subrecord in jsonData[key1]:
-                for key2 in subrecord.keys():
-                    updateStat(node_type, key2, subrecord[key2])
-        else:
-            updateStat(node_type, key1, jsonData[key1])
-
+    features.extend(addressList)
+    features.extend(groupAssociationList)
+    features.extend(relPointerList)
+    jsonData["FEATURES"] = features
     return jsonData
 
 
@@ -429,6 +395,13 @@ if __name__ == "__main__":
         default=os.getenv("log_file".upper(), None),
         type=str,
         help="optional statistics filename (json format)",
+    )
+    argparser.add_argument(
+        "-d",
+        "--database_file",
+        default=os.getenv("database_file".upper(), None),
+        type=str,
+        help="optional sqlite work database to create (default: a temporary one next to the output file)",
     )
     argparser.add_argument(
         "-a",
@@ -468,9 +441,7 @@ if __name__ == "__main__":
 
     # --register the expected files
     inputFiles = []
-    inputFiles.append(
-        {"fileName": "nodes-entities.csv", "nodeDatabase": "icij", "nodeType": "entity"}
-    )
+    inputFiles.append({"fileName": "nodes-entities.csv", "nodeDatabase": "icij", "nodeType": "entity"})
     inputFiles.append(
         {
             "fileName": "nodes-intermediaries.csv",
@@ -492,24 +463,21 @@ if __name__ == "__main__":
             "nodeType": "address",
         }
     )
-    inputFiles.append(
-        {"fileName": "nodes-others.csv", "nodeDatabase": "icij", "nodeType": "other"}
-    )
-    inputFiles.append(
-        {"fileName": "relationships.csv", "nodeDatabase": "icij", "nodeType": "edges"}
-    )
+    inputFiles.append({"fileName": "nodes-others.csv", "nodeDatabase": "icij", "nodeType": "other"})
+    inputFiles.append({"fileName": "relationships.csv", "nodeDatabase": "icij", "nodeType": "edges"})
     # --create a table name for each file
     for i in range(len(inputFiles)):
-        inputFiles[i]["tableName"] = (
-            inputFiles[i]["nodeDatabase"] + "_" + inputFiles[i]["nodeType"]
-        )
+        inputFiles[i]["tableName"] = inputFiles[i]["nodeDatabase"] + "_" + inputFiles[i]["nodeType"]
 
-    # --open database connection and load from csv if first time
-    dbname = (
-        inputPath + (os.path.sep if inputPath[-1:] != os.path.sep else "") + "icij2.db"
-    )
-    dbExists = os.path.exists(dbname)
-    if dbExists:
+    # --the working database goes next to the output file (never into the input folder, which may be read-only
+    # --or shared) and is removed when the run ends, unless --database_file names a file to keep
+    if args.database_file:
+        dbname = args.database_file
+    else:
+        workDir = tempfile.mkdtemp(prefix="icij_mapper_", dir=os.path.dirname(os.path.abspath(outputFileName)))
+        atexit.register(shutil.rmtree, workDir, True)
+        dbname = os.path.join(workDir, "icij2.db")
+    if os.path.exists(dbname):
         os.remove(dbname)
     conn = sqlite3.connect(dbname)
     csv2db()
@@ -525,6 +493,7 @@ if __name__ == "__main__":
             break
 
     outputFileHandle.close()
+    conn.close()
 
     # --write statistics file
     if logFile:
